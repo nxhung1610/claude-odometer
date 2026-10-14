@@ -14,8 +14,8 @@ const PANE = {
   scroll: { offset: 0, bodyRows: 40 },
   view: {},
 }
-const QUOTA = { plugin: 'account-quota', surface: TERMINAL, component: 'PromptHint' as const, props: HINT, viewport: WIDE }
-const TOKENS_PANE = { plugin: 'account-quota', surface: TERMINAL, component: 'Pane' as const, requestId: 'tokens', props: PANE, viewport: WIDE }
+const QUOTA = { plugin: 'odometer', surface: TERMINAL, component: 'PromptHint' as const, props: HINT, viewport: WIDE }
+const TOKENS_PANE = { plugin: 'odometer', surface: TERMINAL, component: 'Pane' as const, requestId: 'tokens', props: PANE, viewport: WIDE }
 const TOKENS = {
   command: 'tokens',
   args: '',
