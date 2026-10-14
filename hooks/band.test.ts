@@ -39,3 +39,23 @@ test('the band shows the speed on its own row, with dashes before a turn', async
   expect(await ui.find({ type: 'Text', text: /TTFT —/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('while a step runs, the light sits on one letter of working', async ($, on) => {
+  // 550 ms into a 1.5 s sweep, which is the third letter.
+  mock.clock(on, { now: 1_500_000 + 550 })
+  // The band reads its speed from state; this answers that read with a step under way.
+  on('state.get', (_, e) => ({
+    value: { value: e.key === 'timing' ? { running: { startedAt: 1_500_000, firstOutputAt: 0 } } : undefined, version: 1 },
+  }))
+
+  const ui = await $.ui.mount({
+    plugin: 'odometer',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    props: BAND,
+  })
+
+  expect(await ui.find({ type: 'Text', text: 'r' })).toMatchObject({ props: { color: 'claude', bold: true } })
+  expect(await ui.find({ type: 'Text', text: 'w' })).toMatchObject({ props: { color: 'inactive' } })
+  await ui.unmount()
+})
