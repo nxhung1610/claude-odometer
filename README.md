@@ -47,8 +47,8 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 - `session.start` reads the current rate-limit windows.
 - `session.measure` updates them when the engine reports a change in a window.
-- `ui.render` on `AbovePrompt` draws them as one row in the band above the prompt, with the last turn's speed after them. The band yields while a survey holds it.
-- `turn.start`, `turn.step` and `turn.complete` time each turn. TTFT is the wait until the model's first output: a chunk of text, thinking, or a tool call. TPS is output tokens per second from there to the turn's end.
+- `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, and the model's speed on the row beneath. The band yields while a survey holds it.
+- `turn.step` times each model step. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band shows how long it has run.
 - `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `~/.claude/projects`. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus a count of sessions; it sends nothing anywhere.
 
 ## Files

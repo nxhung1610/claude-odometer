@@ -31,11 +31,19 @@ export type TokenScanState =
 /** The span the `/tokens` pane charts. */
 export type TokenRange = 'week' | 'month' | 'all'
 
-/** How fast the last turn ran: the wait before its first output, and the output speed after it. */
-export type TurnTiming = {
-  /** Milliseconds from the turn's start to its first output: a chunk of text, thinking, or a tool call. */
-  ttftMs: number
-  /** Output tokens per second from the first output to the turn's end; absent when the turn wrote no output. */
+/** A model step that has started and not yet stopped: when it started, and when its first output came (0 until it does). */
+export type RunningStep = {
+  startedAt: number
+  firstOutputAt: number
+}
+
+/** How fast the model answers: the step running now, its latest time to first output, and its latest output speed. */
+export type ModelSpeed = {
+  /** The step running now; null between steps. */
+  running: RunningStep | null
+  /** Milliseconds from a step's start to its first output, for the latest step that had output. */
+  ttftMs?: number
+  /** Output tokens per second, for the latest step that measured one; kept until the next step does. */
   tps?: number
 }
 
@@ -45,7 +53,7 @@ declare module 'claude-code' {
       windows: QuotaWindow[]
       tokens: TokenScanState
       range: TokenRange
-      timing: TurnTiming | null
+      timing: ModelSpeed | null
     }
   }
 }

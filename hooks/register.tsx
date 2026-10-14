@@ -1,10 +1,10 @@
 import type { Register } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState, TurnTiming } from '../types'
+import type { ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
 import { BAR_WIDTH, barCells, labelOf, resetLabel, toneOf } from './format'
-import { formatTps, formatTtft, tpsOf } from './timing'
+import { speedLine, tpsOf } from './timing'
 import {
   CHART_ROWS,
   axisLabels,
@@ -38,7 +38,7 @@ const range = atom(
 
 const timing = atom(
   { plugin: 'odometer', key: 'timing' } as const,
-  null as TurnTiming | null,
+  null as ModelSpeed | null,
 )
 
 const PANE = 'tokens'
@@ -85,35 +85,34 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Times each turn: when it started, when the model's first output arrived, and when
-  // it ended. The steps pass on unchanged; the speed is kept for the band to show.
-  let startedAt = 0
-  let firstOutputAt = 0
-
-  on('turn.start', async ($, e, next) => {
-    startedAt = await $.clock.now()
-    firstOutputAt = 0
-
-    return next(e)
-  })
-
+  // Times each model step. A step starts when its stream does; its time to first output
+  // is the wait for its first chunk of text, thinking, a tool call or its input; and its
+  // stop carries the output tokens. The steps pass on unchanged.
   on('turn.step', async function* ($, e, next) {
-    for await (const chunk of next(e)) {
-      if (startedAt > 0 && firstOutputAt === 0 && OUTPUT.has(chunk.kind)) firstOutputAt = await $.clock.now()
-      yield chunk
-    }
-  })
+    const startedAt = await $.clock.now()
+    await update($, timing, prev => ({ ...(prev ?? {}), running: { startedAt, firstOutputAt: 0 } }))
+    // Redraws the band each second while the step runs, so its elapsed time counts up.
+    const tick = $.clock.every(1000, () => $.ui.invalidate('ui.render'))
 
-  on('turn.complete', async ($, e, next) => {
-    if (startedAt > 0 && firstOutputAt > 0) {
-      const endedAt = await $.clock.now()
-      await update($, timing, () => ({
-        ttftMs: firstOutputAt - startedAt,
-        tps: tpsOf(e.usage?.output_tokens ?? 0, firstOutputAt, endedAt),
-      }))
+    let firstOutputAt = 0
+    try {
+      for await (const chunk of next(e)) {
+        if (firstOutputAt === 0 && OUTPUT.has(chunk.kind)) {
+          firstOutputAt = await $.clock.now()
+          const ttftMs = firstOutputAt - startedAt
+          await update($, timing, prev => ({ ...(prev ?? {}), running: { startedAt, firstOutputAt }, ttftMs }))
+        }
+        if (chunk.kind === 'stop') {
+          const stoppedAt = await $.clock.now()
+          const tps = firstOutputAt > 0 ? tpsOf(chunk.usage?.output_tokens ?? 0, firstOutputAt, stoppedAt) : undefined
+          await update($, timing, prev => ({ ...(prev ?? {}), running: null, tps: tps ?? prev?.tps }))
+        }
+        yield chunk
+      }
+    } finally {
+      tick.cancel()
+      await update($, timing, prev => ({ ...(prev ?? {}), running: null }))
     }
-
-    return next(e)
   })
 
   // Opens the pane first, then runs the scanner the mod ships. Only per-day
@@ -143,22 +142,21 @@ export const register: Register = on => {
     return { text: 'Tokens pane updated.' }
   })
 
-  // Draws the quota on one row of the band directly above the prompt, and the last
-  // turn's speed on the row beneath it, both aligned left. The band is shared with
-  // surveys, so it yields while one holds it. It sizes to bodyColumns, which keeps
-  // clear of the band's own [-] mark.
+  // Draws the quota on one row of the band directly above the prompt, and the model's
+  // speed on the row beneath it, both aligned left. The band is shared with surveys, so
+  // it yields while one holds it. It sizes to bodyColumns, which keeps clear of the
+  // band's own [-] mark.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
 
     const rows = await read($, windows)
     const speed = await read($, timing)
-    const now = new Date(await $.clock.now())
+    const nowMs = await $.clock.now()
+    const now = new Date(nowMs)
     const { Box, Text } = $.ui.resolve(e)
     const roomy = e.props.bodyColumns >= 105
     const withReset = e.props.bodyColumns >= 97
     const barWidth = e.props.bodyColumns >= 90 ? BAR_WIDTH : 6
-    const tps = speed && speed.tps !== undefined ? formatTps(speed.tps) : '—'
-    const ttft = speed ? formatTtft(speed.ttftMs) : '—'
 
     return (
       <Box flexDirection="column" marginTop={1}>
@@ -188,7 +186,7 @@ export const register: Register = on => {
             })
           )}
         </Box>
-        <Text color="inactive">{`  TPS ${tps} · TTFT ${ttft}`}</Text>
+        <Text color="inactive">{`  ${speedLine(speed?.running ?? null, speed?.ttftMs, speed?.tps, nowMs)}`}</Text>
       </Box>
     )
   })
