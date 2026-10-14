@@ -1,0 +1,26 @@
+{
+  "name": "claude-odometer",
+  "version": "0.2.0",
+  "description": "Installs the odometer Claude Code plugin: 5-hour and 7-day usage limits on the prompt line, and a /tokens pane.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nxhung1610/claude-odometer.git"
+  },
+  "bin": {
+    "claude-odometer": "bin/install.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "plugin",
+    "rate-limit",
+    "usage"
+  ]
+}
