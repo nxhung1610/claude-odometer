@@ -1,0 +1,32 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the Claude Code CLI the mod is tested with
+        run: npm install -g @anthropic-ai/claude-code@2.1.299
+
+      - name: Validate the manifest and hooks
+        run: claude plugin validate .
+
+      - name: Run the mod's tests
+        run: claude plugin test
+
+      - name: Run the scanner's tests
+        run: python3 -m unittest discover -s hooks -p 'test_*.py'
