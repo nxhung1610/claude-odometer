@@ -4,8 +4,15 @@ import { expect, mock, test } from 'claude-code/testing'
 const NOW = new Date(2026, 9, 14, 12, 0)
 const TODAY = '2026-10-14'
 const TERMINAL = 'terminal' as const
-const HINT = { isDraft: false, isWorking: false, hint: '? for shortcuts' }
 const WIDE = { columns: 140, rows: 40 }
+const BAND = {
+  hasSurvey: false,
+  isWorking: false,
+  maxRows: 4,
+  bodyColumns: 140,
+  scroll: { offset: 0, bodyRows: 4 },
+  view: {},
+}
 const PANE = {
   title: 'Tokens per day',
   isFocused: false,
@@ -14,7 +21,7 @@ const PANE = {
   scroll: { offset: 0, bodyRows: 40 },
   view: {},
 }
-const QUOTA = { plugin: 'odometer', surface: TERMINAL, component: 'PromptHint' as const, props: HINT, viewport: WIDE }
+const QUOTA = { plugin: 'odometer', surface: TERMINAL, component: 'AbovePrompt' as const, props: BAND }
 const TOKENS_PANE = { plugin: 'odometer', surface: TERMINAL, component: 'Pane' as const, requestId: 'tokens', props: PANE, viewport: WIDE }
 const TOKENS = {
   command: 'tokens',
@@ -170,26 +177,24 @@ test('a scan that fails says why, with the first line of its error', async ($, o
   await ui.unmount()
 })
 
-test('a narrow terminal stacks the quota under the hint, with a 6-cell bar', async ($, on) => {
+test('a narrow band draws the quota with a 6-cell bar', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [{ kind: 'five_hour', percentUsed: 23 }])
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
-  const ui = await $.ui.mount({ ...QUOTA, viewport: { columns: 80, rows: 40 } })
-  expect(await ui.drawn()).toMatchObject({ type: 'Box', props: { flexDirection: 'column' } })
+  const ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 60 } })
   // 23% of 6 cells is one filled cell, so five stay empty.
   expect(await ui.find({ type: 'Text', text: '░░░░░' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '░░░░░░░░' })).toBeUndefined()
   await ui.unmount()
 })
 
-test('a wide terminal keeps the quota on the hint row, with a 10-cell bar', async ($, on) => {
+test('a wide band draws the quota with a 10-cell bar', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [{ kind: 'five_hour', percentUsed: 23 }])
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
-  const ui = await $.ui.mount({ ...QUOTA, viewport: { columns: 140, rows: 40 } })
-  expect(await ui.drawn()).toMatchObject({ type: 'Box', props: { flexDirection: 'row' } })
+  const ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 100 } })
   // 23% of 10 cells is two filled cells, so eight stay empty.
   expect(await ui.find({ type: 'Text', text: '░░░░░░░░' })).toBeDefined()
   await ui.unmount()

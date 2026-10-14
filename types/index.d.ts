@@ -31,12 +31,21 @@ export type TokenScanState =
 /** The span the `/tokens` pane charts. */
 export type TokenRange = 'week' | 'month' | 'all'
 
+/** How fast the last turn ran: the wait before its first output, and the output speed after it. */
+export type TurnTiming = {
+  /** Milliseconds from the turn's start to its first output: a chunk of text, thinking, or a tool call. */
+  ttftMs: number
+  /** Output tokens per second from the first output to the turn's end; absent when the turn wrote no output. */
+  tps?: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'odometer': {
       windows: QuotaWindow[]
       tokens: TokenScanState
       range: TokenRange
+      timing: TurnTiming | null
     }
   }
 }
