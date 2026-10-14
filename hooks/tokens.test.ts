@@ -33,6 +33,14 @@ test('model ids read as their names', () => {
   expect(modelName('mystery-model')).toBe('mystery-model')
 })
 
+test('dated snapshot ids and the older id order read as their names too', () => {
+  expect(modelName('claude-sonnet-4-5-20250929')).toBe('Sonnet 4.5')
+  expect(modelName('claude-opus-4-1-20250805')).toBe('Opus 4.1')
+  expect(modelName('claude-3-5-haiku-20241022')).toBe('Haiku 3.5')
+  expect(modelName('claude-3-opus-20240229')).toBe('Opus 3')
+  expect(modelName('claude-sonnet-4-5-2025')).toBe('claude-sonnet-4-5-2025')
+})
+
 test('token counts read in k, M and B, and shares to one decimal', () => {
   expect(formatTokens(1.8e9)).toBe('1.8B')
   expect(formatTokens(230.5e6)).toBe('230.5M')
@@ -115,6 +123,18 @@ test('a column stacks its models from the bottom, eight levels to a row', () => 
   expect(grid[7]?.[2]?.color).toBe('success')
   expect(grid[7]?.[3]?.color).toBe('warning')
   expect(grid[3]?.[3]?.color).toBe('claude')
+})
+
+test('a day with any usage draws at least one level, even beside a much busier day', () => {
+  const columns = [
+    { label: 'busy', total: 2_000_000, segments: [{ model: 'claude-opus-5-5', tokens: 2_000_000 }] },
+    { label: 'light', total: 50, segments: [{ model: 'claude-opus-5-5', tokens: 50 }] },
+  ]
+  const grid = chartRows(columns, 2_000_000)
+
+  expect(grid[7]?.[1]?.char).toBe('▁')
+  expect(grid[7]?.[1]?.color).toBe('claude')
+  expect(grid[6]?.[1]?.char).toBe(' ')
 })
 
 test('the axis reads top, middle and bottom', () => {

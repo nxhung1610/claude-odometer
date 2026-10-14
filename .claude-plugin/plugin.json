@@ -1,6 +1,7 @@
 {
   "name": "account-quota",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Shows the account's 5-hour and 7-day usage limits on the prompt hint line, right under the input.",
+  "author": { "name": "nxhung" },
   "types": "./types/index.d.ts"
 }

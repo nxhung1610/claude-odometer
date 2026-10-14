@@ -43,6 +43,19 @@ const RANGES: ReadonlyArray<{ key: TokenRange; label: string }> = [
   { key: 'month', label: 'Last 30 days' },
 ]
 
+// `python3` is the name on macOS and Linux, and Windows usually has only `python`.
+// A candidate passes when it answers `--version` as Python 3: a missing command,
+// a Windows stub that exits non-zero, or an older Python 2 fails the probe.
+async function pythonFor(
+  run: (argv: string[]) => Promise<{ exitCode: number; stdout: string; stderr: string }>,
+): Promise<string | undefined> {
+  for (const name of ['python3', 'python']) {
+    const probe = await run([name, '--version']).catch(() => undefined)
+    if (probe?.exitCode === 0 && /Python 3\./.test(`${probe.stdout}${probe.stderr}`)) return name
+  }
+  return undefined
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const reading = await $.session.usage()
@@ -64,13 +77,15 @@ export const register: Register = on => {
   })
 
   // Opens the pane first, then runs the scanner the mod ships. Only per-day
-  // token counts come back; no message text is read.
+  // token counts come back; no message text is kept.
   on('command.run', { command: 'tokens' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Tokens per day' })
     await update($, tokens, () => ({ status: 'scanning' as const }))
     try {
+      const python = await pythonFor(argv => $.process.run(argv, { timeoutMs: 10_000 }))
+      if (!python) throw new Error('Python 3 was not found on the PATH, as python3 or python')
       const ran = await $.process.run(
-        ['python3', '-I', `${$.plugin.root}/hooks/scan_usage.py`],
+        [python, '-I', `${$.plugin.root}/hooks/scan_usage.py`],
         { timeoutMs: 120_000 },
       )
       if (ran.exitCode === 0) {
@@ -198,7 +213,7 @@ export const register: Register = on => {
             ))}
             <Text color="inactive">{`${' '.repeat(7)} └${'─'.repeat(bars.length * 2)}`}</Text>
             <Text color="inactive">
-              {`${' '.repeat(10)}${dayLabel(bars[0]?.label ?? '')} … ${dayLabel(bars[bars.length - 1]?.label ?? '')}`}
+              {`${' '.repeat(10)}${dayLabel(days[0] ?? '')} … ${dayLabel(days[days.length - 1] ?? '')}`}
             </Text>
             <Box flexDirection="row">
               {entries.map(([id]) => (

@@ -5,7 +5,10 @@ export const CHART_ROWS = 8
 
 const LEVELS = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const MODEL_ID = /^claude-(opus|sonnet|haiku)-(\d+)-(\d+)$/
+/** `claude-<family>-<major>-<minor>`, with or without a `-YYYYMMDD` snapshot date. */
+const MODEL_ID = /^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d+))?(?:-\d{8})?$/
+/** The older order, `claude-<major>-<minor>-<family>`, with the same optional date. */
+const OLDER_MODEL_ID = /^claude-(\d+)(?:-(\d+))?-(opus|sonnet|haiku)(?:-\d{8})?$/
 const NONE: ModelTokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
 
 export type ChartColor = 'claude' | 'success' | 'warning' | 'inactive'
@@ -20,12 +23,23 @@ export type Column = {
 /** One cell of the chart: a level character in a color; an empty cell is a blank. */
 export type Cell = { char: string; color: ChartColor }
 
-/** `claude-haiku-5-5` reads as `Haiku 5.5`; an id it does not know reads as it is. */
+/** `claude-<family>-<major>-<minor>` reads as `<Family> <major>.<minor>`; an id it does not know reads as it is. */
 export function modelName(id: string): string {
-  const match = MODEL_ID.exec(id)
-  if (!match) return id
-  const [, family = '', major = '', minor = ''] = match
-  return `${family.charAt(0).toUpperCase()}${family.slice(1)} ${major}.${minor}`
+  const recent = MODEL_ID.exec(id)
+  if (recent) {
+    const [, family = '', major = '', minor] = recent
+    return nameOf(family, major, minor)
+  }
+  const older = OLDER_MODEL_ID.exec(id)
+  if (!older) return id
+  const [, major = '', minor, family = ''] = older
+  return nameOf(family, major, minor)
+}
+
+/** `Family 5.5`, or `Family 3` when the id names no minor version. */
+function nameOf(family: string, major: string, minor?: string): string {
+  const name = `${family.charAt(0).toUpperCase()}${family.slice(1)} ${major}`
+  return minor ? `${name}.${minor}` : name
 }
 
 /** Opus, Sonnet and Haiku each have a color; any other model is drawn grey. */
@@ -139,12 +153,17 @@ export function columnsWithSegments(
 
 /**
  * The chart as rows from the top down. Each column is as tall as its share of
- * the largest column; its models stack from the bottom in the order given, and
- * a cell takes the color of the model at its top.
+ * the largest column, and at least one level when it has any tokens; its models
+ * stack from the bottom in the order given, and a cell takes the color of the
+ * model at its top.
  */
 export function chartRows(columns: Column[], max: number, rows = CHART_ROWS): Cell[][] {
   const levels = rows * 8
-  const heights = columns.map(column => (max > 0 ? Math.round((column.total / max) * levels) : 0))
+  const heights = columns.map(column => {
+    if (max <= 0 || column.total <= 0) return 0
+    // Any usage shows at least one level, so a light day does not draw as a gap.
+    return Math.max(1, Math.round((column.total / max) * levels))
+  })
   const grid: Cell[][] = []
   for (let row = rows - 1; row >= 0; row--) {
     grid.push(

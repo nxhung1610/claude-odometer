@@ -3,9 +3,13 @@
 Prints one JSON object:
   {"sessions": n, "days": {"YYYY-MM-DD": {model: {input, output, cacheRead, cacheWrite}}}}
 
+Here n counts the session transcripts that had usage. A sub-agent transcript adds
+its tokens, but it is not a session of its own.
+
 A response is written to a transcript once per content block, with the same
 message id and the same usage each time, so each message id is counted once.
-Only the usage counts, the model and the timestamp are read; no message text.
+Each line is parsed, but only the usage counts, the model, the timestamp and the
+file's place in the folders are used; no message text is kept.
 """
 
 import datetime
@@ -31,8 +35,14 @@ def local_day(stamp):
     return when.astimezone().date().isoformat()
 
 
+def is_session_transcript(path):
+    """True for <project>/<session>.jsonl, a session's own transcript, not a sub-agent's."""
+    return len(os.path.relpath(path, ROOT).split(os.sep)) == 2
+
+
 def main():
     seen = set()
+    sessions = set()
     days = {}
     paths = glob.glob(os.path.join(ROOT, "**", "*.jsonl"), recursive=True)
     for path in paths:
@@ -56,11 +66,14 @@ def main():
                 if day is None:
                     continue
                 seen.add(message_id)
+                # A session counts once, by its own transcript; sub-agent transcripts add tokens only.
+                if is_session_transcript(path):
+                    sessions.add(path)
                 model = message.get("model") or "unknown"
                 tally = days.setdefault(day, {}).setdefault(model, dict.fromkeys(FIELDS, 0))
                 for key, field in FIELDS.items():
                     tally[key] += int(usage.get(field) or 0)
-    json.dump({"sessions": len(paths), "days": days}, sys.stdout)
+    json.dump({"sessions": len(sessions), "days": days}, sys.stdout)
 
 
 if __name__ == "__main__":
