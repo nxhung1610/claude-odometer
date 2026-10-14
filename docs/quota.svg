@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="176" viewBox="0 0 560 176">
+  <rect width="560" height="176" rx="12" fill="#1a1a19"/>
+  <g font-family="ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15">
+<text x="36" y="66" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">  5h </tspan><tspan fill="#0ca30c">▓▓</tspan><tspan fill="#383835">░░░░░░░░</tspan><tspan fill="#0ca30c" font-weight="700"> 23%</tspan><tspan fill="#c3c2b7">  ↻ 14:20</tspan></text>
+<text x="397.59999999999997" y="66" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">under 70%</tspan></text>
+<text x="36" y="110" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">  5h </tspan><tspan fill="#fab219">▓▓▓▓▓▓▓▓</tspan><tspan fill="#383835">░░</tspan><tspan fill="#fab219" font-weight="700"> 75%</tspan><tspan fill="#c3c2b7">  ↻ Tue 09:00</tspan></text>
+<text x="397.59999999999997" y="110" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">70% to 89%</tspan></text>
+<text x="36" y="154" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">  5h </tspan><tspan fill="#d03b3b">▓▓▓▓▓▓▓▓▓</tspan><tspan fill="#383835">░</tspan><tspan fill="#d03b3b" font-weight="700"> 91%</tspan><tspan fill="#c3c2b7">  ↻ Mon 14:00</tspan></text>
+<text x="397.59999999999997" y="154" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">90% and up</tspan></text>
+  </g>
+</svg>

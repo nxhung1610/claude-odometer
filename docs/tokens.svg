@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="402" viewBox="0 0 620 402">
+  <rect width="620" height="402" rx="12" fill="#1a1a19"/>
+  <g font-family="ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15">
+  <rect x="149.51999999999998" y="48" width="125.51999999999998" height="26" rx="6" fill="#2c2c2a"/>
+<text x="36" y="34" xml:space="preserve" style="white-space:pre"><tspan fill="#f0efec" font-weight="700">Tokens per day</tspan></text>
+<text x="36" y="66" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">  All time   </tspan><tspan fill="#f0efec" font-weight="700"> Last 7 days </tspan><tspan fill="#c3c2b7">   Last 30 days</tspan></text>
+<text x="99.28" y="108" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">1.4M</text>
+<rect x="234.88" y="92" width="9.04" height="22" fill="#fab219"/>
+<rect x="234.88" y="114" width="9.04" height="22" fill="#0ca30c"/>
+<rect x="216.79999999999998" y="147" width="9.04" height="11" fill="#fab219"/>
+<rect x="234.88" y="136" width="9.04" height="22" fill="#0ca30c"/>
+<rect x="144.48" y="169" width="9.04" height="11" fill="#fab219"/>
+<rect x="216.79999999999998" y="158" width="9.04" height="22" fill="#0ca30c"/>
+<rect x="234.88" y="158" width="9.04" height="22" fill="#d95926"/>
+<text x="99.28" y="196" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">695.0k</text>
+<rect x="144.48" y="180" width="9.04" height="22" fill="#0ca30c"/>
+<rect x="162.56" y="188.25" width="9.04" height="13.75" fill="#fab219"/>
+<rect x="216.79999999999998" y="180" width="9.04" height="22" fill="#0ca30c"/>
+<rect x="234.88" y="180" width="9.04" height="22" fill="#d95926"/>
+<rect x="126.39999999999999" y="202" width="9.04" height="22" fill="#fab219"/>
+<rect x="144.48" y="202" width="9.04" height="22" fill="#d95926"/>
+<rect x="162.56" y="202" width="9.04" height="22" fill="#0ca30c"/>
+<rect x="216.79999999999998" y="202" width="9.04" height="22" fill="#d95926"/>
+<rect x="234.88" y="202" width="9.04" height="22" fill="#d95926"/>
+<rect x="126.39999999999999" y="224" width="9.04" height="22" fill="#d95926"/>
+<rect x="144.48" y="224" width="9.04" height="22" fill="#d95926"/>
+<rect x="162.56" y="224" width="9.04" height="22" fill="#d95926"/>
+<rect x="216.79999999999998" y="224" width="9.04" height="22" fill="#d95926"/>
+<rect x="234.88" y="224" width="9.04" height="22" fill="#d95926"/>
+<text x="99.28" y="262" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">0</text>
+<rect x="126.39999999999999" y="246" width="9.04" height="22" fill="#d95926"/>
+<rect x="144.48" y="246" width="9.04" height="22" fill="#d95926"/>
+<rect x="162.56" y="246" width="9.04" height="22" fill="#d95926"/>
+<rect x="180.64" y="248.75" width="9.04" height="19.25" fill="#0ca30c"/>
+<rect x="198.71999999999997" y="265.25" width="9.04" height="2.75" fill="#d95926"/>
+<rect x="216.79999999999998" y="246" width="9.04" height="22" fill="#d95926"/>
+<rect x="234.88" y="246" width="9.04" height="22" fill="#d95926"/>
+<rect x="112.33999999999999" y="92" width="1" height="176" fill="#898781"/>
+<rect x="112.33999999999999" y="268" width="140.62" height="1" fill="#898781"/>
+<text x="126.39999999999999" y="290" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Oct 8 … Oct 14</tspan></text>
+<text x="36" y="326" xml:space="preserve" style="white-space:pre"><tspan fill="#d95926">■ </tspan><tspan fill="#c3c2b7">Opus 5.5   </tspan><tspan fill="#0ca30c">■ </tspan><tspan fill="#c3c2b7">Sonnet 5.5   </tspan><tspan fill="#fab219">■ </tspan><tspan fill="#c3c2b7">Haiku 5.5</tspan></text>
+<text x="36" y="358" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">4.5M tokens across 12 sessions.</tspan></text>
+<text x="36" y="380" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">Each API response is counted once; /stats adds every log row.</tspan></text>
+  </g>
+</svg>

@@ -1,16 +1,22 @@
 # claude-odometer
 
+[![test](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml/badge.svg)](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml)
+
 A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a line right above the prompt, each with a bar and its reset time, and below it how fast the model is answering.
 
-```text
-Quota  5h ▓▓░░░░░░░░ 23%  ↻ 14:20   ·   7d ▓▓▓▓▓▓▓▓▓░ 91%  ↻ Mon 14:00
-TTFT 850ms · TPS 42 tok/s
-❯
-```
+![The quota row at three levels: 23% in green, 75% in amber, 91% in red](docs/quota.svg)
 
-- Green under 70%, amber from 70%, red from 90%.
-- `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time.
-- The row beneath shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run.
+## What it shows
+
+**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time.
+
+**Speed.** The row beneath the quota shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`.
+
+![While a step runs, a light moves across the word working, one letter at a time](docs/speed.svg)
+
+**`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data.
+
+![The /tokens pane: a stacked column chart of tokens per day, with a legend for Opus, Sonnet and Haiku](docs/tokens.svg)
 
 ## Install
 
@@ -57,6 +63,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 - `.claude-plugin/`: `plugin.json`, and `marketplace.json`, which the install line above reads
 - `bin/install.js`, `package.json`: an installer that runs the install line above through the Claude Code CLI, and its npm metadata
+- `docs/*.svg`: the illustrations above; the numbers in the tokens chart are example data
 - `hooks/register.tsx`: hooks, the quota and speed rows above the prompt, and the `/tokens` pane
 - `hooks/timing.ts`: the speed row's text, the TTFT and TPS arithmetic, and the light's position
 - `hooks/format.ts`: bar, tone, and reset-label helpers
