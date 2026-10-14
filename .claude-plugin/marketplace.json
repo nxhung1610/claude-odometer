@@ -1,0 +1,8 @@
+{
+  "name": "claude-odometer",
+  "owner": { "name": "nxhung" },
+  "metadata": {
+    "description": "The 5-hour and 7-day usage limits on the prompt line, and a /tokens pane with tokens per day by model."
+  },
+  "plugins": [{ "name": "odometer", "source": "./" }]
+}
