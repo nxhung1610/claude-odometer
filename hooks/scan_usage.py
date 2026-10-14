@@ -7,7 +7,8 @@ Here n counts the sessions that had usage; a sub-agent transcript belongs to its
 
 A response is written to a transcript once per content block, with the same
 message id and the same usage each time, so each message id is counted once.
-Only the usage counts, the model and the timestamp are read; no message text.
+Each line is parsed, but only the usage counts, the model, the timestamp and the
+session id are used; no message text is kept.
 """
 
 import datetime

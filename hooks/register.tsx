@@ -64,7 +64,7 @@ export const register: Register = on => {
   })
 
   // Opens the pane first, then runs the scanner the mod ships. Only per-day
-  // token counts come back; no message text is read.
+  // token counts come back; no message text is kept.
   on('command.run', { command: 'tokens' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Tokens per day' })
     await update($, tokens, () => ({ status: 'scanning' as const }))

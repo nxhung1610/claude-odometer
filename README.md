@@ -16,6 +16,8 @@ git clone https://github.com/nxhung1610/claude-odometer.git
 claude --plugin-dir /path/to/claude-odometer
 ```
 
+`/tokens` runs `hooks/scan_usage.py` with `python3`, so `python3` must be on your `PATH`.
+
 ## Development
 
 ```bash
@@ -31,7 +33,7 @@ python3 -m unittest discover -s hooks -p 'test_*.py'  # the transcript scanner's
 - `session.start` reads the current rate-limit windows.
 - `session.measure` updates them when the engine reports a change in a window.
 - `ui.render` on `PromptHint` draws them after the engine's own hint text.
-- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with `python3` over the transcripts in `~/.claude/projects`. The script reads only each response's usage counts, model and timestamp, and sends nothing anywhere.
+- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with `python3` over the transcripts in `~/.claude/projects`. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus a count of sessions; it sends nothing anywhere.
 
 ## Files
 
