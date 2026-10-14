@@ -75,19 +75,27 @@ class ScanUsageTest(unittest.TestCase):
             {DAY: {"claude-opus-5-5": {"input": 4, "output": 0, "cacheRead": 0, "cacheWrite": 0}}},
         )
 
-    def test_sessions_counts_each_session_with_usage_once_sub_agent_files_included(self):
+    def test_sessions_counts_session_transcripts_that_had_usage(self):
         self.write("project/session-a.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, session="session-a"))
         self.write(
             "project/session-a/subagents/agent-x.jsonl",
             reply("msg_2", "claude-opus-5-5", {"input_tokens": 1}, session="session-a"),
         )
-        self.write("project/session-b.jsonl", reply("msg_3", "claude-opus-5-5", {"input_tokens": 1}, session="session-b"))
+        # A sub-agent transcript that names a session id of its own still belongs to its parent.
+        self.write(
+            "project/session-a/subagents/agent-y.jsonl",
+            reply("msg_3", "claude-opus-5-5", {"input_tokens": 1}, session="agent-only"),
+        )
+        self.write("project/session-b.jsonl", reply("msg_4", "claude-opus-5-5", {"input_tokens": 1}, session="session-b"))
         self.write(
             "project/session-c.jsonl",
             json.dumps({"type": "user", "sessionId": "session-c", "message": {"role": "user", "content": "hi"}}),
         )
 
-        self.assertEqual(self.scan()["sessions"], 2)
+        scan = self.scan()
+        self.assertEqual(scan["sessions"], 2)
+        # Sub-agent tokens still count toward the days: four responses, one input token each.
+        self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 4)
 
 
 if __name__ == "__main__":
