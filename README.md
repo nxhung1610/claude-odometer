@@ -1,14 +1,16 @@
 # claude-odometer
 
-A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a line right above the prompt, each with a bar and its reset time.
+A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a line right above the prompt, each with a bar and its reset time, and below it how fast the model is answering.
 
 ```text
 Quota  5h ▓▓░░░░░░░░ 23%  ↻ 14:20   ·   7d ▓▓▓▓▓▓▓▓▓░ 91%  ↻ Mon 14:00
+TTFT 850ms · TPS 42 tok/s
 ❯
 ```
 
 - Green under 70%, amber from 70%, red from 90%.
 - `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time.
+- The row beneath shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run.
 
 ## Install
 
@@ -48,17 +50,19 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 - `session.start` reads the current rate-limit windows.
 - `session.measure` updates them when the engine reports a change in a window.
 - `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, and the model's speed on the row beneath. The band yields while a survey holds it.
-- `turn.step` times each model step. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band shows how long it has run, and a light moves across the word `working`.
+- `turn.step` times each model step. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
 - `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `~/.claude/projects`. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus a count of sessions; it sends nothing anywhere.
 
 ## Files
 
 - `.claude-plugin/`: `plugin.json`, and `marketplace.json`, which the install line above reads
-- `hooks/register.tsx`: hooks, the quota row above the prompt, and the `/tokens` pane
+- `bin/install.js`, `package.json`: an installer that runs the install line above through the Claude Code CLI, and its npm metadata
+- `hooks/register.tsx`: hooks, the quota and speed rows above the prompt, and the `/tokens` pane
+- `hooks/timing.ts`: the speed row's text, the TTFT and TPS arithmetic, and the light's position
 - `hooks/format.ts`: bar, tone, and reset-label helpers
 - `hooks/tokens.ts`: the `/tokens` chart and summary helpers
 - `hooks/scan_usage.py`: counts tokens per day and model from the transcripts
 - `hooks/*.test.ts`, `hooks/test_scan_usage.py`: tests
-- `types/index.d.ts`: the `QuotaWindow` type and plugin state declaration
+- `types/index.d.ts`: the `QuotaWindow` and `ModelSpeed` types, and the plugin state declaration
 
 Tested with Claude Code 2.1.299.
