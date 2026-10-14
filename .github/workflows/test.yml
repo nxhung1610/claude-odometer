@@ -47,3 +47,29 @@ jobs:
 
       - name: Run the scanner's tests
         run: python -m unittest discover -s hooks -p "test_*.py"
+
+  # Temporary: which Python commands a plain Windows runner has, without setup-python.
+  probe-python:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Which Python commands a plain Windows runner has (PowerShell)
+        shell: pwsh
+        run: |
+          foreach ($name in 'python3', 'python') {
+            $cmd = Get-Command $name -ErrorAction SilentlyContinue
+            if ($cmd) {
+              & $name --version 2>&1 | Out-Host
+              "$name resolves to: $($cmd.Source)"
+            } else {
+              "$name: not on PATH"
+            }
+          }
+
+      - name: The same check from bash
+        shell: bash
+        run: |
+          for name in python3 python; do
+            printf '%s: ' "$name"
+            "$name" --version 2>&1 || echo "not found"
+          done
