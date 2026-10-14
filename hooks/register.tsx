@@ -161,7 +161,7 @@ export const register: Register = on => {
     const ttft = speed ? formatTtft(speed.ttftMs) : '—'
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" marginTop={1}>
         <Box flexDirection="row">
           <Text color="claude" bold>
             {roomy ? '  Quota  ' : '  Quota '}
