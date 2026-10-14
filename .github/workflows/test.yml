@@ -10,7 +10,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +22,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Shows which Python commands this runner has, since the mod looks for python3, then python.
+      - name: Show the Python commands on this runner
+        shell: bash
+        run: |
+          for name in python3 python; do
+            printf '%s: ' "$name"
+            "$name" --version 2>&1 || echo "not found"
+          done
 
       - name: Install the Claude Code CLI the mod is tested with
         run: npm install -g @anthropic-ai/claude-code@2.1.299
@@ -29,4 +46,4 @@ jobs:
         run: claude plugin test
 
       - name: Run the scanner's tests
-        run: python3 -m unittest discover -s hooks -p 'test_*.py'
+        run: python -m unittest discover -s hooks -p "test_*.py"

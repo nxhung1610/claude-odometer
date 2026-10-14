@@ -30,7 +30,7 @@ python3 -m unittest discover -s hooks -p 'test_*.py'  # the transcript scanner's
 
 The plugin is named `account-quota` in `plugin.json`. Keep that name: the state the mod keeps is stored under it, so a rename would make that state start over.
 
-CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the scanner tests on pull requests and on pushes to `main`, with Claude Code 2.1.299.
+CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the scanner tests on Ubuntu and Windows, on pull requests and on pushes to `main`, with Claude Code 2.1.299.
 
 ## How it works
 
