@@ -1,3 +1,9 @@
+/** The word the speed row shows while a step runs. */
+export const WORKING = 'working'
+
+/** How often the band redraws while a step runs: ten times a second. */
+export const FRAME_MS = 100
+
 /** `850ms` under a second, then `1.2s`. */
 export function formatTtft(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
@@ -38,8 +44,19 @@ export function speedLine(
   const tpsText = tps === undefined ? '—' : formatTps(tps)
   if (running) {
     const ttftText = running.firstOutputAt > 0 && ttftMs !== undefined ? formatTtft(ttftMs) : '…'
-    return `working ${formatElapsed(nowMs - running.startedAt)} · TTFT ${ttftText} · last TPS ${tpsText}`
+    return `${WORKING} ${formatElapsed(nowMs - running.startedAt)} · TTFT ${ttftText} · last TPS ${tpsText}`
   }
   const ttftText = ttftMs === undefined ? '—' : formatTtft(ttftMs)
   return `TTFT ${ttftText} · TPS ${tpsText}`
+}
+
+/**
+ * Which letter of `WORKING` the light sits on at `nowMs`, or undefined while it is off
+ * the word. The light crosses the word once per `periodMs`, entering just before the
+ * first letter and leaving just after the last.
+ */
+export function sweepIndex(nowMs: number, periodMs = 1500): number | undefined {
+  const step = ((nowMs % periodMs) * (WORKING.length + 2)) / periodMs
+  const index = Math.floor(step) - 1
+  return index >= 0 && index < WORKING.length ? index : undefined
 }

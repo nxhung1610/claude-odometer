@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { formatElapsed, formatTps, formatTtft, speedLine, tpsOf } from './timing'
+import { FRAME_MS, formatElapsed, formatTps, formatTtft, speedLine, sweepIndex, tpsOf } from './timing'
 
 test('time to first output reads in milliseconds, then seconds', () => {
   expect(formatTtft(850)).toBe('850ms')
@@ -39,4 +39,19 @@ test('while a step runs, the row counts its time and waits for its first output'
   expect(speedLine({ startedAt: 1000, firstOutputAt: 1400 }, 400, undefined, 4400)).toBe(
     'working 3s · TTFT 400ms · last TPS —',
   )
+})
+
+test('the light crosses working once per period, from left to right', () => {
+  const lit: number[] = []
+  for (let t = 0; t < 1500; t += FRAME_MS) {
+    const index = sweepIndex(t)
+    if (index !== undefined) lit.push(index)
+  }
+  // Every letter is lit in turn, and the light never moves back.
+  expect([...new Set(lit)]).toEqual([0, 1, 2, 3, 4, 5, 6])
+  expect(lit).toEqual([...lit].sort((a, b) => a - b))
+})
+
+test('the light repeats each period', () => {
+  expect(sweepIndex(4_200)).toBe(sweepIndex(5_700))
 })

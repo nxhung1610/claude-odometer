@@ -4,7 +4,7 @@ import { atom, read, update } from 'claude-code'
 import type { ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
 import { BAR_WIDTH, barCells, labelOf, resetLabel, toneOf } from './format'
-import { speedLine, tpsOf } from './timing'
+import { FRAME_MS, WORKING, speedLine, sweepIndex, tpsOf } from './timing'
 import {
   CHART_ROWS,
   axisLabels,
@@ -91,8 +91,9 @@ export const register: Register = on => {
   on('turn.step', async function* ($, e, next) {
     const startedAt = await $.clock.now()
     await update($, timing, prev => ({ ...(prev ?? {}), running: { startedAt, firstOutputAt: 0 } }))
-    // Redraws the band each second while the step runs, so its elapsed time counts up.
-    const tick = $.clock.every(1000, () => $.ui.invalidate('ui.render'))
+    // Redraws the band ten times a second while the step runs: the elapsed seconds count
+    // up, and the light sweeps across the word working.
+    const tick = $.clock.every(FRAME_MS, () => $.ui.invalidate('ui.render'))
 
     let firstOutputAt = 0
     try {
@@ -157,6 +158,9 @@ export const register: Register = on => {
     const roomy = e.props.bodyColumns >= 105
     const withReset = e.props.bodyColumns >= 97
     const barWidth = e.props.bodyColumns >= 90 ? BAR_WIDTH : 6
+    const running = speed?.running ?? null
+    const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
+    const lit = running ? sweepIndex(nowMs) : undefined
 
     return (
       <Box flexDirection="column" marginTop={1}>
@@ -186,7 +190,17 @@ export const register: Register = on => {
             })
           )}
         </Box>
-        <Text color="inactive">{`  ${speedLine(speed?.running ?? null, speed?.ttftMs, speed?.tps, nowMs)}`}</Text>
+        <Box flexDirection="row">
+          <Text color="inactive">{'  '}</Text>
+          {running ? (
+            [...WORKING].map((letter, i) => (
+              <Text key={`letter-${i}`} color={i === lit ? 'claude' : 'inactive'} bold={i === lit}>
+                {letter}
+              </Text>
+            ))
+          ) : null}
+          <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
+        </Box>
       </Box>
     )
   })
