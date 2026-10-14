@@ -60,9 +60,9 @@ jobs:
             $cmd = Get-Command $name -ErrorAction SilentlyContinue
             if ($cmd) {
               & $name --version 2>&1 | Out-Host
-              "$name resolves to: $($cmd.Source)"
+              "${name} resolves to: $($cmd.Source)"
             } else {
-              "$name: not on PATH"
+              "${name}: not on PATH"
             }
           }
 
