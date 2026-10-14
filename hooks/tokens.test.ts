@@ -5,6 +5,7 @@ import type { TokenScan } from '../types'
 import {
   axisLabels,
   chartRows,
+  colorOf,
   columnsOf,
   columnsWithSegments,
   daysInRange,
@@ -26,6 +27,10 @@ const SCAN: TokenScan = {
     },
   },
 }
+
+const OPUS = '#d95926'
+const SONNET = '#3987e5'
+const HAIKU = '#199e70'
 
 test('model ids read as their names', () => {
   expect(modelName('claude-haiku-5-5')).toBe('Haiku 5.5')
@@ -118,11 +123,11 @@ test('a column stacks its models from the bottom, eight levels to a row', () => 
   expect(grid[0]?.[0]?.char).toBe('█')
   expect(grid[0]?.[1]?.char).toBe(' ')
   expect(grid[4]?.[1]?.char).toBe('█')
-  expect(grid[4]?.[1]?.color).toBe('claude')
+  expect(grid[4]?.[1]?.color).toBe(OPUS)
   expect(grid[7]?.[2]?.char).toBe('▆')
-  expect(grid[7]?.[2]?.color).toBe('success')
-  expect(grid[7]?.[3]?.color).toBe('warning')
-  expect(grid[3]?.[3]?.color).toBe('claude')
+  expect(grid[7]?.[2]?.color).toBe(SONNET)
+  expect(grid[7]?.[3]?.color).toBe(HAIKU)
+  expect(grid[3]?.[3]?.color).toBe(OPUS)
 })
 
 test('a day with any usage draws at least one level, even beside a much busier day', () => {
@@ -133,10 +138,17 @@ test('a day with any usage draws at least one level, even beside a much busier d
   const grid = chartRows(columns, 2_000_000)
 
   expect(grid[7]?.[1]?.char).toBe('▁')
-  expect(grid[7]?.[1]?.color).toBe('claude')
+  expect(grid[7]?.[1]?.color).toBe(OPUS)
   expect(grid[6]?.[1]?.char).toBe(' ')
 })
 
 test('the axis reads top, middle and bottom', () => {
   expect(axisLabels(1.8e9)).toEqual(['1.8B', '900.0M', '0'])
+})
+
+test('each model has its own color, none of them a status color', () => {
+  const colors = [colorOf('claude-opus-5-5'), colorOf('claude-sonnet-5-5'), colorOf('claude-haiku-5-5')]
+  expect(colors).toEqual([OPUS, SONNET, HAIKU])
+  expect(new Set(colors).size).toBe(3)
+  expect(colorOf('mystery-model')).toBe('inactive')
 })

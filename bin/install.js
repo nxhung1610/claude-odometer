@@ -10,7 +10,7 @@ const WINDOWS = process.platform === 'win32'
 const flags = new Set(process.argv.slice(2))
 
 if (flags.has('--help')) {
-  console.log('Usage: npx claude-odometer [--print]')
+  console.log('Usage: node bin/install.js [--print]')
   console.log('Installs the odometer plugin for your user, through the Claude Code CLI.')
   console.log('  --print  show the command that would run, and run nothing')
   process.exit(0)

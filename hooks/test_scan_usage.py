@@ -8,6 +8,8 @@ import sys
 import tempfile
 import unittest
 
+import scan_usage
+
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scan_usage.py")
 DAY = datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
 USAGE = {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 20}
@@ -96,6 +98,61 @@ class ScanUsageTest(unittest.TestCase):
         self.assertEqual(scan["sessions"], 2)
         # Sub-agent tokens still count toward the days: four responses, one input token each.
         self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 4)
+
+
+class SummarizeTest(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.TemporaryDirectory()
+        self.addCleanup(self.root.cleanup)
+
+    def write(self, path, *lines):
+        """Writes a transcript under a fake projects folder and returns its path."""
+        file = os.path.join(self.root.name, path)
+        os.makedirs(os.path.dirname(file), exist_ok=True)
+        with open(file, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines))
+        return file
+
+    def test_a_non_numeric_count_is_zero_and_the_rest_still_counts(self):
+        path = self.write(
+            "project/session-1.jsonl",
+            reply("msg_1", "claude-opus-5-5", {"input_tokens": "lots", "output_tokens": 5}),
+            reply("msg_2", "claude-opus-5-5", {"input_tokens": 7}),
+        )
+
+        opus = scan_usage.summarize([path], root=self.root.name)["days"][DAY]["claude-opus-5-5"]
+        self.assertEqual(opus["input"], 7)
+        self.assertEqual(opus["output"], 5)
+
+    def test_lines_of_the_wrong_shape_are_skipped(self):
+        path = self.write(
+            "project/session-1.jsonl",
+            '[1, 2, "usage"]',
+            '{"message": "usage"}',
+            json.dumps({"message": {"id": ["not", "text"], "usage": {"input_tokens": 1}}, "timestamp": "2026-10-13T12:00:00Z"}),
+            json.dumps(
+                {
+                    "message": {"id": "msg_9", "model": {"name": "x"}, "usage": {"input_tokens": 3}},
+                    "timestamp": "2026-10-13T12:00:00Z",
+                }
+            ),
+        )
+
+        days = scan_usage.summarize([path], root=self.root.name)["days"]
+        self.assertEqual(days, {DAY: {"unknown": {"input": 3, "output": 0, "cacheRead": 0, "cacheWrite": 0}}})
+
+    def test_a_session_counts_whichever_of_its_files_is_read_first(self):
+        sub_agent = self.write(
+            "project/session-1/subagents/agent-x.jsonl",
+            reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, session="session-1"),
+        )
+        main = self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, session="session-1"))
+
+        for order in ([sub_agent, main], [main, sub_agent]):
+            with self.subTest(order=order):
+                summary = scan_usage.summarize(order, root=self.root.name)
+                self.assertEqual(summary["sessions"], 1)
+                self.assertEqual(summary["days"][DAY]["claude-opus-5-5"]["input"], 1)
 
 
 if __name__ == "__main__":

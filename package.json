@@ -1,7 +1,7 @@
 {
   "name": "claude-odometer",
-  "version": "0.2.0",
-  "description": "Installs the odometer Claude Code plugin: 5-hour and 7-day usage limits on the prompt line, and a /tokens pane.",
+  "version": "0.2.2",
+  "description": "Installs the odometer Claude Code plugin: the 5-hour and 7-day usage limits and the model's speed above the prompt, and a /tokens pane.",
   "license": "MIT",
   "repository": {
     "type": "git",

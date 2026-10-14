@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { FRAME_MS, formatElapsed, formatTps, formatTtft, speedLine, sweepIndex, tpsOf } from './timing'
+import { FRAME_MS, applyStep, formatElapsed, formatTps, formatTtft, speedLine, sweepIndex, tpsOf } from './timing'
 
 test('time to first output reads in milliseconds, then seconds', () => {
   expect(formatTtft(850)).toBe('850ms')
@@ -54,4 +54,37 @@ test('the light crosses working once per period, from left to right', () => {
 
 test('the light repeats each period', () => {
   expect(sweepIndex(4_200)).toBe(sweepIndex(5_700))
+})
+
+test('a step sets its time to first output once, and its speed when it stops', () => {
+  let speed = applyStep(null, { kind: 'start', at: 1000 })
+  speed = applyStep(speed, { kind: 'output', at: 1850 })
+  speed = applyStep(speed, { kind: 'output', at: 2400 })
+  expect(speed.ttftMs).toBe(850)
+  expect(speed.running).toEqual({ startedAt: 1000, firstOutputAt: 1850 })
+
+  // 300 tokens over the 2 seconds from the first output to the stop.
+  speed = applyStep(speed, { kind: 'stop', at: 3850, outputTokens: 300 })
+  expect(speed).toEqual({ running: null, ttftMs: 850, tps: 150 })
+})
+
+test('a step with no output keeps the speed the step before it measured', () => {
+  let speed = applyStep(null, { kind: 'start', at: 0 })
+  speed = applyStep(speed, { kind: 'output', at: 500 })
+  speed = applyStep(speed, { kind: 'stop', at: 2500, outputTokens: 200 })
+
+  speed = applyStep(speed, { kind: 'start', at: 3000 })
+  expect(speed.ttftMs).toBe(500)
+  speed = applyStep(speed, { kind: 'stop', at: 3100, outputTokens: 0 })
+  expect(speed).toEqual({ running: null, ttftMs: 500, tps: 100 })
+})
+
+test('a stream that ends without a stop still clears the running step', () => {
+  let speed = applyStep(null, { kind: 'start', at: 0 })
+  speed = applyStep(speed, { kind: 'end' })
+  expect(speed).toEqual({ running: null })
+})
+
+test('an output with no step running changes nothing', () => {
+  expect(applyStep(null, { kind: 'output', at: 10 })).toEqual({ running: null })
 })
