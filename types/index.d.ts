@@ -33,7 +33,7 @@ export type TokenRange = 'week' | 'month' | 'all'
 
 declare module 'claude-code' {
   interface PluginState {
-    'account-quota': {
+    'odometer': {
       windows: QuotaWindow[]
       tokens: TokenScanState
       range: TokenRange

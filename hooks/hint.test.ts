@@ -7,7 +7,7 @@ test('the quota line stays under the prompt hint, with no data yet before a read
   mock.clock(on, { now: NOW })
 
   const ui = await $.ui.mount({
-    plugin: 'account-quota',
+    plugin: 'odometer',
     surface: 'terminal',
     component: 'PromptHint',
     props: HINT,

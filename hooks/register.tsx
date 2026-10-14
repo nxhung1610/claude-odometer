@@ -21,17 +21,17 @@ import {
 } from './tokens'
 
 const windows = atom(
-  { plugin: 'account-quota', key: 'windows' } as const,
+  { plugin: 'odometer', key: 'windows' } as const,
   [] as QuotaWindow[],
 )
 
 const tokens = atom(
-  { plugin: 'account-quota', key: 'tokens' } as const,
+  { plugin: 'odometer', key: 'tokens' } as const,
   { status: 'idle' } as TokenScanState,
 )
 
 const range = atom(
-  { plugin: 'account-quota', key: 'range' } as const,
+  { plugin: 'odometer', key: 'range' } as const,
   'week' as TokenRange,
 )
 
