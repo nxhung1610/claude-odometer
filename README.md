@@ -11,6 +11,16 @@ A Claude Code mod that shows your account's 5-hour and 7-day usage limits on the
 
 ## Install
 
+In a terminal Claude Code session, version 2.1.275 or later, type:
+
+```text
+/plugin install odometer --marketplace nxhung1610/claude-odometer
+```
+
+Answer `y` to add the marketplace, then press Enter to take the default user scope. The mod is active in that session, and in each session you start after.
+
+To run it from a clone, as you would while developing it:
+
 ```bash
 git clone https://github.com/nxhung1610/claude-odometer.git
 claude --plugin-dir /path/to/claude-odometer
@@ -41,6 +51,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 ## Files
 
+- `.claude-plugin/`: `plugin.json`, and `marketplace.json`, which the install line above reads
 - `hooks/register.tsx`: hooks and the prompt-line render
 - `hooks/format.ts`: bar, tone, and reset-label helpers
 - `hooks/tokens.ts`: the `/tokens` chart and summary helpers
