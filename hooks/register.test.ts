@@ -169,3 +169,28 @@ test('a scan that fails says why, with the first line of its error', async ($, o
   expect(await ui.find({ type: 'Text', text: 'Could not read the transcripts: python3: command not found' })).toBeDefined()
   await ui.unmount()
 })
+
+test('a narrow terminal stacks the quota under the hint, with a 6-cell bar', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [{ kind: 'five_hour', percentUsed: 23 }])
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount({ ...QUOTA, viewport: { columns: 80, rows: 40 } })
+  expect(await ui.drawn()).toMatchObject({ type: 'Box', props: { flexDirection: 'column' } })
+  // 23% of 6 cells is one filled cell, so five stay empty.
+  expect(await ui.find({ type: 'Text', text: '░░░░░' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '░░░░░░░░' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a wide terminal keeps the quota on the hint row, with a 10-cell bar', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [{ kind: 'five_hour', percentUsed: 23 }])
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount({ ...QUOTA, viewport: { columns: 140, rows: 40 } })
+  expect(await ui.drawn()).toMatchObject({ type: 'Box', props: { flexDirection: 'row' } })
+  // 23% of 10 cells is two filled cells, so eight stay empty.
+  expect(await ui.find({ type: 'Text', text: '░░░░░░░░' })).toBeDefined()
+  await ui.unmount()
+})
