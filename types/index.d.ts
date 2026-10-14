@@ -7,8 +7,36 @@ export type QuotaWindow = {
   resetsAt?: string
 }
 
+/** Tokens one model used: input, output, and the cache reads and writes, each response counted once. */
+export type ModelTokens = {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+/** What the transcript scan found: the sessions read, and per local day (YYYY-MM-DD) each model's tokens. */
+export type TokenScan = {
+  sessions: number
+  days: Record<string, Record<string, ModelTokens>>
+}
+
+/** The `/tokens` pane's scan: waiting, running, then the result or why it failed. */
+export type TokenScanState =
+  | { status: 'idle' }
+  | { status: 'scanning' }
+  | { status: 'ready'; scan: TokenScan }
+  | { status: 'failed'; reason: string }
+
+/** The span the `/tokens` pane charts. */
+export type TokenRange = 'week' | 'month' | 'all'
+
 declare module 'claude-code' {
   interface PluginState {
-    'account-quota': { windows: QuotaWindow[] }
+    'account-quota': {
+      windows: QuotaWindow[]
+      tokens: TokenScanState
+      range: TokenRange
+    }
   }
 }

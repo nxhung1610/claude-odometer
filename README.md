@@ -3,11 +3,11 @@
 A Claude Code mod that shows your account's 5-hour and 7-day usage limits on the line right under the prompt, each with a bar and its reset time.
 
 ```text
-? for shortcuts   Quota  5h ▓▓░░░░░░░░ 23%  resets 14:20   ·   7d ▓▓▓▓▓▓▓▓▓░ 91%  resets Mon 14:00
+? for shortcuts   Quota  5h ▓▓░░░░░░░░ 23%  ↻ 14:20   ·   7d ▓▓▓▓▓▓▓▓▓░ 91%  ↻ Mon 14:00
 ```
 
 - Green under 70%, amber from 70%, red from 90%.
-- A reset later today shows the time. Any other day shows the weekday and time.
+- `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time.
 
 ## Install
 
@@ -30,11 +30,14 @@ claude plugin validate .  # check the manifest and hooks
 - `session.start` reads the current rate-limit windows.
 - `session.measure` updates them when the engine reports a change in a window.
 - `ui.render` on `PromptHint` draws them after the engine's own hint text.
+- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with `python3` over the transcripts in `~/.claude/projects`. The script reads only each response's usage counts, model and timestamp, and sends nothing anywhere.
 
 ## Files
 
 - `hooks/register.tsx`: hooks and the prompt-line render
 - `hooks/format.ts`: bar, tone, and reset-label helpers
+- `hooks/tokens.ts`: the `/tokens` chart and summary helpers
+- `hooks/scan_usage.py`: counts tokens per day and model from the transcripts
 - `hooks/*.test.ts`: tests
 - `types/index.d.ts`: the `QuotaWindow` type and plugin state declaration
 
