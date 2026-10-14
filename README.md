@@ -1,9 +1,10 @@
 # claude-odometer
 
-A Claude Code mod that shows your account's 5-hour and 7-day usage limits on the line right under the prompt, each with a bar and its reset time.
+A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a line right above the prompt, each with a bar and its reset time.
 
 ```text
-? for shortcuts   Quota  5h ▓▓░░░░░░░░ 23%  ↻ 14:20   ·   7d ▓▓▓▓▓▓▓▓▓░ 91%  ↻ Mon 14:00
+Quota  5h ▓▓░░░░░░░░ 23%  ↻ 14:20   ·   7d ▓▓▓▓▓▓▓▓▓░ 91%  ↻ Mon 14:00
+❯
 ```
 
 - Green under 70%, amber from 70%, red from 90%.
@@ -46,13 +47,14 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 - `session.start` reads the current rate-limit windows.
 - `session.measure` updates them when the engine reports a change in a window.
-- `ui.render` on `PromptHint` draws them after the engine's own hint text.
+- `ui.render` on `AbovePrompt` draws them as one row in the band above the prompt, with the last turn's speed after them. The band yields while a survey holds it.
+- `turn.start`, `turn.step` and `turn.complete` time each turn. TTFT is the wait until the model's first output: a chunk of text, thinking, or a tool call. TPS is output tokens per second from there to the turn's end.
 - `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `~/.claude/projects`. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus a count of sessions; it sends nothing anywhere.
 
 ## Files
 
 - `.claude-plugin/`: `plugin.json`, and `marketplace.json`, which the install line above reads
-- `hooks/register.tsx`: hooks and the prompt-line render
+- `hooks/register.tsx`: hooks, the quota row above the prompt, and the `/tokens` pane
 - `hooks/format.ts`: bar, tone, and reset-label helpers
 - `hooks/tokens.ts`: the `/tokens` chart and summary helpers
 - `hooks/scan_usage.py`: counts tokens per day and model from the transcripts

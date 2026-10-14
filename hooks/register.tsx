@@ -1,9 +1,10 @@
 import type { Register } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
+import type { ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState, TurnTiming } from '../types'
 
 import { BAR_WIDTH, barCells, labelOf, resetLabel, toneOf } from './format'
+import { formatTps, formatTtft, tpsOf } from './timing'
 import {
   CHART_ROWS,
   axisLabels,
@@ -35,7 +36,15 @@ const range = atom(
   'week' as TokenRange,
 )
 
+const timing = atom(
+  { plugin: 'odometer', key: 'timing' } as const,
+  null as TurnTiming | null,
+)
+
 const PANE = 'tokens'
+
+/** The chunks that mean the model has begun to answer; the stop and the engine's own do not. */
+const OUTPUT = new Set<string>(['text', 'thinking', 'tool', 'input'])
 
 const RANGES: ReadonlyArray<{ key: TokenRange; label: string }> = [
   { key: 'all', label: 'All time' },
@@ -76,6 +85,37 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // Times each turn: when it started, when the model's first output arrived, and when
+  // it ended. The steps pass on unchanged; the speed is kept for the band to show.
+  let startedAt = 0
+  let firstOutputAt = 0
+
+  on('turn.start', async ($, e, next) => {
+    startedAt = await $.clock.now()
+    firstOutputAt = 0
+
+    return next(e)
+  })
+
+  on('turn.step', async function* ($, e, next) {
+    for await (const chunk of next(e)) {
+      if (startedAt > 0 && firstOutputAt === 0 && OUTPUT.has(chunk.kind)) firstOutputAt = await $.clock.now()
+      yield chunk
+    }
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    if (startedAt > 0 && firstOutputAt > 0) {
+      const endedAt = await $.clock.now()
+      await update($, timing, () => ({
+        ttftMs: firstOutputAt - startedAt,
+        tps: tpsOf(e.usage?.output_tokens ?? 0, firstOutputAt, endedAt),
+      }))
+    }
+
+    return next(e)
+  })
+
   // Opens the pane first, then runs the scanner the mod ships. Only per-day
   // token counts come back; no message text is kept.
   on('command.run', { command: 'tokens' }, async $ => {
@@ -103,55 +143,52 @@ export const register: Register = on => {
     return { text: 'Tokens pane updated.' }
   })
 
-  // Draws the engine's hint line as it stands, with the quota after it, so the
-  // figures sit right under the input and keep their theme colors. On a narrow
-  // terminal the quota drops under the hint, lined up with it, as one block.
-  on('ui.render', { component: 'PromptHint' }, async ($, e) => {
+  // Draws the quota on one row of the band directly above the prompt, and the last
+  // turn's speed on the row beneath it, both aligned left. The band is shared with
+  // surveys, so it yields while one holds it. It sizes to bodyColumns, which keeps
+  // clear of the band's own [-] mark.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+
     const rows = await read($, windows)
+    const speed = await read($, timing)
     const now = new Date(await $.clock.now())
     const { Box, Text } = $.ui.resolve(e)
-    const columns = e.viewport?.columns ?? 80
-    const roomy = columns >= 140
-    const barWidth = columns >= 90 ? BAR_WIDTH : 6
+    const roomy = e.props.bodyColumns >= 105
+    const withReset = e.props.bodyColumns >= 97
+    const barWidth = e.props.bodyColumns >= 90 ? BAR_WIDTH : 6
+    const tps = speed && speed.tps !== undefined ? formatTps(speed.tps) : '—'
+    const ttft = speed ? formatTtft(speed.ttftMs) : '—'
 
-    const quota = (
-      <Box flexDirection="row" flexShrink={0}>
-        <Text color="claude" bold>
-          {roomy ? '   Quota  ' : 'Quota '}
-        </Text>
-        {rows.length === 0 ? (
-          <Text color="inactive">no data yet</Text>
-        ) : (
-          rows.map((w, i) => {
-            const percent = Math.round(w.percentUsed)
-            const tone = toneOf(percent)
-            const cells = barCells(percent, barWidth)
-            const reset = resetLabel(w.resetsAt, now)
-
-            return (
-              <Box key={w.kind} flexDirection="row">
-                {i > 0 ? <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text> : null}
-                <Text color="inactive">{labelOf(w.kind)} </Text>
-                <Text color={tone}>{cells.filled}</Text>
-                <Text color="subtle">{cells.empty}</Text>
-                <Text color={tone}>{` ${percent}%`}</Text>
-                {reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
-              </Box>
-            )
-          })
-        )}
-      </Box>
-    )
-
-    return roomy ? (
-      <Box flexDirection="row">
-        <Text dimColor>{e.props.hint}</Text>
-        {quota}
-      </Box>
-    ) : (
+    return (
       <Box flexDirection="column">
-        <Text dimColor>{e.props.hint}</Text>
-        {quota}
+        <Box flexDirection="row">
+          <Text color="claude" bold>
+            {roomy ? '  Quota  ' : '  Quota '}
+          </Text>
+          {rows.length === 0 ? (
+            <Text color="inactive">no data yet</Text>
+          ) : (
+            rows.map((w, i) => {
+              const percent = Math.round(w.percentUsed)
+              const tone = toneOf(percent)
+              const cells = barCells(percent, barWidth)
+              const reset = resetLabel(w.resetsAt, now)
+
+              return (
+                <Box key={w.kind} flexDirection="row">
+                  {i > 0 ? <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text> : null}
+                  <Text color="inactive">{labelOf(w.kind)} </Text>
+                  <Text color={tone}>{cells.filled}</Text>
+                  <Text color="subtle">{cells.empty}</Text>
+                  <Text color={tone}>{` ${percent}%`}</Text>
+                  {withReset && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
+                </Box>
+              )
+            })
+          )}
+        </Box>
+        <Text color="inactive">{`  TPS ${tps} · TTFT ${ttft}`}</Text>
       </Box>
     )
   })
