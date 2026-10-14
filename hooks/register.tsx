@@ -4,7 +4,7 @@ import { atom, read, update } from 'claude-code'
 import type { ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
 import { BAR_WIDTH, barCells, labelOf, resetLabel, toneOf } from './format'
-import { FRAME_MS, WORKING, speedLine, sweepIndex, tpsOf } from './timing'
+import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
   CHART_ROWS,
   axisLabels,
@@ -39,6 +39,13 @@ const range = atom(
 const timing = atom(
   { plugin: 'odometer', key: 'timing' } as const,
   null as ModelSpeed | null,
+)
+
+// Counts the frames drawn while a step runs. The light's place on the word comes from it,
+// and the band reads it, so each frame redraws the band alone.
+const sweep = atom(
+  { plugin: 'odometer', key: 'sweep' } as const,
+  0,
 )
 
 const PANE = 'tokens'
@@ -90,29 +97,30 @@ export const register: Register = on => {
   // stop carries the output tokens. The steps pass on unchanged.
   on('turn.step', async function* ($, e, next) {
     const startedAt = await $.clock.now()
-    await update($, timing, prev => ({ ...(prev ?? {}), running: { startedAt, firstOutputAt: 0 } }))
-    // Redraws the band ten times a second while the step runs: the elapsed seconds count
-    // up, and the light sweeps across the word working.
-    const tick = $.clock.every(FRAME_MS, () => $.ui.invalidate('ui.render'))
+    await update($, timing, speed => applyStep(speed, { kind: 'start', at: startedAt }))
+    // Each frame, the band redraws: the elapsed seconds count up and the light moves on.
+    const tick = $.clock.every(FRAME_MS, () => {
+      update($, sweep, frames => (frames ?? 0) + 1).catch(() => undefined)
+    })
 
-    let firstOutputAt = 0
+    let answered = false
     try {
       for await (const chunk of next(e)) {
-        if (firstOutputAt === 0 && OUTPUT.has(chunk.kind)) {
-          firstOutputAt = await $.clock.now()
-          const ttftMs = firstOutputAt - startedAt
-          await update($, timing, prev => ({ ...(prev ?? {}), running: { startedAt, firstOutputAt }, ttftMs }))
+        if (!answered && OUTPUT.has(chunk.kind)) {
+          answered = true
+          const at = await $.clock.now()
+          await update($, timing, speed => applyStep(speed, { kind: 'output', at }))
         }
         if (chunk.kind === 'stop') {
-          const stoppedAt = await $.clock.now()
-          const tps = firstOutputAt > 0 ? tpsOf(chunk.usage?.output_tokens ?? 0, firstOutputAt, stoppedAt) : undefined
-          await update($, timing, prev => ({ ...(prev ?? {}), running: null, tps: tps ?? prev?.tps }))
+          const at = await $.clock.now()
+          const outputTokens = chunk.usage?.output_tokens ?? 0
+          await update($, timing, speed => applyStep(speed, { kind: 'stop', at, outputTokens }))
         }
         yield chunk
       }
     } finally {
       tick.cancel()
-      await update($, timing, prev => ({ ...(prev ?? {}), running: null }))
+      await update($, timing, speed => applyStep(speed, { kind: 'end' }))
     }
   })
 
@@ -128,6 +136,8 @@ export const register: Register = on => {
         [python, '-I', `${$.plugin.root}/hooks/scan_usage.py`],
         { timeoutMs: 120_000 },
       )
+      // The reply is cut at 4 MiB; a cut reply is not valid JSON, so say why instead.
+      if (ran.isStdoutTruncated) throw new Error('The scan printed more than 4 MiB, too much to read')
       if (ran.exitCode === 0) {
         const scan = JSON.parse(ran.stdout) as TokenScan
         await update($, tokens, () => ({ status: 'ready' as const, scan }))
@@ -158,9 +168,10 @@ export const register: Register = on => {
     const roomy = e.props.bodyColumns >= 105
     const withReset = e.props.bodyColumns >= 97
     const barWidth = e.props.bodyColumns >= 90 ? BAR_WIDTH : 6
+    const frames = await read($, sweep)
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
-    const lit = running ? sweepIndex(nowMs) : undefined
+    const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
 
     return (
       <Box flexDirection="column" marginTop={1}>

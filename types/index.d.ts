@@ -54,6 +54,8 @@ declare module 'claude-code' {
       tokens: TokenScanState
       range: TokenRange
       timing: ModelSpeed | null
+      /** Frames drawn while a model step runs; the light on the word `working` moves with it. */
+      sweep: number
     }
   }
 }

@@ -1,3 +1,5 @@
+import type { ModelSpeed } from '../types'
+
 /** The word the speed row shows while a step runs. */
 export const WORKING = 'working'
 
@@ -59,4 +61,37 @@ export function sweepIndex(nowMs: number, periodMs = 1500): number | undefined {
   const step = ((nowMs % periodMs) * (WORKING.length + 2)) / periodMs
   const index = Math.floor(step) - 1
   return index >= 0 && index < WORKING.length ? index : undefined
+}
+
+/** What a model step's stream reports, in order: it starts, its first output comes, it stops, or the stream ends. */
+export type StepEvent =
+  | { kind: 'start'; at: number }
+  | { kind: 'output'; at: number }
+  | { kind: 'stop'; at: number; outputTokens: number }
+  | { kind: 'end' }
+
+/**
+ * The speed state after one of a step's events. The time to first output is set at the
+ * step's first output. Its output speed is set when it stops; a step with no output keeps
+ * the speed the step before it measured. An output with no step running changes nothing.
+ */
+export function applyStep(speed: ModelSpeed | null, event: StepEvent): ModelSpeed {
+  const prev: ModelSpeed = speed ?? { running: null }
+  switch (event.kind) {
+    case 'start':
+      return { ...prev, running: { startedAt: event.at, firstOutputAt: 0 } }
+    case 'output': {
+      const running = prev.running
+      if (!running || running.firstOutputAt > 0) return prev
+      return { ...prev, running: { ...running, firstOutputAt: event.at }, ttftMs: event.at - running.startedAt }
+    }
+    case 'stop': {
+      const running = prev.running
+      const tps =
+        running && running.firstOutputAt > 0 ? tpsOf(event.outputTokens, running.firstOutputAt, event.at) : undefined
+      return { ...prev, running: null, tps: tps ?? prev.tps }
+    }
+    case 'end':
+      return { ...prev, running: null }
+  }
 }

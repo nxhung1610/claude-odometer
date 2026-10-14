@@ -152,6 +152,17 @@ test('a machine with no Python 3 says so in the pane', async ($, on) => {
   await ui.unmount()
 })
 
+test('a scan whose reply is cut short says so, rather than failing to read it', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  withPython(on, () => ({ ...ran(0, JSON.stringify(SCAN)), isStdoutTruncated: true }))
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: 'Could not read the transcripts: The scan printed more than 4 MiB, too much to read' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('the chart axis runs from the first day of the range to the last', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on)

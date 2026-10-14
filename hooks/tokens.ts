@@ -11,7 +11,8 @@ const MODEL_ID = /^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d+))?(?:-\d{8})?$/
 const OLDER_MODEL_ID = /^claude-(\d+)(?:-(\d+))?-(opus|sonnet|haiku)(?:-\d{8})?$/
 const NONE: ModelTokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
 
-export type ChartColor = 'claude' | 'success' | 'warning' | 'inactive'
+/** A color for a chart mark: one of the model colors below, or a theme key for a model it does not know. */
+export type ChartColor = string
 
 /** One column of the chart: a day, or several days when the range is long. */
 export type Column = {
@@ -42,11 +43,17 @@ function nameOf(family: string, major: string, minor?: string): string {
   return minor ? `${name}.${minor}` : name
 }
 
-/** Opus, Sonnet and Haiku each have a color; any other model is drawn grey. */
+// Categorical slots 2, 1 and 3 of the reference palette, dark steps. Together they pass the
+// palette check on both the light and the dark surface. The theme's own tones do not: its
+// dark ones are too pale for three series to stay apart, and its status tones are reserved
+// for the quota.
+const MODEL_COLORS = { opus: '#d95926', sonnet: '#3987e5', haiku: '#199e70' } as const
+
+/** Opus, Sonnet and Haiku each have a color; any other model is drawn in the theme's inactive tone. */
 export function colorOf(id: string): ChartColor {
-  if (id.includes('opus')) return 'claude'
-  if (id.includes('sonnet')) return 'success'
-  if (id.includes('haiku')) return 'warning'
+  if (id.includes('opus')) return MODEL_COLORS.opus
+  if (id.includes('sonnet')) return MODEL_COLORS.sonnet
+  if (id.includes('haiku')) return MODEL_COLORS.haiku
   return 'inactive'
 }
 

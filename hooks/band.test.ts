@@ -41,11 +41,15 @@ test('the band shows the speed on its own row, with dashes before a turn', async
 })
 
 test('while a step runs, the light sits on one letter of working', async ($, on) => {
-  // 550 ms into a 1.5 s sweep, which is the third letter.
   mock.clock(on, { now: 1_500_000 + 550 })
-  // The band reads its speed from state; this answers that read with a step under way.
+  // The band reads its speed and its frame count from state: a step under way, at frame 5.
+  // Frame 5 is 500 ms into a 1.5 s sweep, which is the third letter.
   on('state.get', (_, e) => ({
-    value: { value: e.key === 'timing' ? { running: { startedAt: 1_500_000, firstOutputAt: 0 } } : undefined, version: 1 },
+    value: {
+      value:
+        e.key === 'timing' ? { running: { startedAt: 1_500_000, firstOutputAt: 0 } } : e.key === 'sweep' ? 5 : undefined,
+      version: 1,
+    },
   }))
 
   const ui = await $.ui.mount({
