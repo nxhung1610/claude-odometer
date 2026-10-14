@@ -3,6 +3,8 @@
 Prints one JSON object:
   {"sessions": n, "days": {"YYYY-MM-DD": {model: {input, output, cacheRead, cacheWrite}}}}
 
+Here n counts the sessions that had usage; a sub-agent transcript belongs to its session.
+
 A response is written to a transcript once per content block, with the same
 message id and the same usage each time, so each message id is counted once.
 Only the usage counts, the model and the timestamp are read; no message text.
@@ -33,6 +35,7 @@ def local_day(stamp):
 
 def main():
     seen = set()
+    sessions = set()
     days = {}
     paths = glob.glob(os.path.join(ROOT, "**", "*.jsonl"), recursive=True)
     for path in paths:
@@ -56,11 +59,14 @@ def main():
                 if day is None:
                     continue
                 seen.add(message_id)
+                # Count sessions by id; a line without one counts as its own file.
+                session = record.get("sessionId")
+                sessions.add(session if isinstance(session, str) and session else path)
                 model = message.get("model") or "unknown"
                 tally = days.setdefault(day, {}).setdefault(model, dict.fromkeys(FIELDS, 0))
                 for key, field in FIELDS.items():
                     tally[key] += int(usage.get(field) or 0)
-    json.dump({"sessions": len(paths), "days": days}, sys.stdout)
+    json.dump({"sessions": len(sessions), "days": days}, sys.stdout)
 
 
 if __name__ == "__main__":

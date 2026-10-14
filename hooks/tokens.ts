@@ -139,12 +139,17 @@ export function columnsWithSegments(
 
 /**
  * The chart as rows from the top down. Each column is as tall as its share of
- * the largest column; its models stack from the bottom in the order given, and
- * a cell takes the color of the model at its top.
+ * the largest column, and at least one level when it has any tokens; its models
+ * stack from the bottom in the order given, and a cell takes the color of the
+ * model at its top.
  */
 export function chartRows(columns: Column[], max: number, rows = CHART_ROWS): Cell[][] {
   const levels = rows * 8
-  const heights = columns.map(column => (max > 0 ? Math.round((column.total / max) * levels) : 0))
+  const heights = columns.map(column => {
+    if (max <= 0 || column.total <= 0) return 0
+    // Any usage shows at least one level, so a light day does not draw as a gap.
+    return Math.max(1, Math.round((column.total / max) * levels))
+  })
   const grid: Cell[][] = []
   for (let row = rows - 1; row >= 0; row--) {
     grid.push(

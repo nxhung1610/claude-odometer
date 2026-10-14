@@ -117,6 +117,18 @@ test('a column stacks its models from the bottom, eight levels to a row', () => 
   expect(grid[3]?.[3]?.color).toBe('claude')
 })
 
+test('a day with any usage draws at least one level, even beside a much busier day', () => {
+  const columns = [
+    { label: 'busy', total: 2_000_000, segments: [{ model: 'claude-opus-5-5', tokens: 2_000_000 }] },
+    { label: 'light', total: 50, segments: [{ model: 'claude-opus-5-5', tokens: 50 }] },
+  ]
+  const grid = chartRows(columns, 2_000_000)
+
+  expect(grid[7]?.[1]?.char).toBe('▁')
+  expect(grid[7]?.[1]?.color).toBe('claude')
+  expect(grid[6]?.[1]?.char).toBe(' ')
+})
+
 test('the axis reads top, middle and bottom', () => {
   expect(axisLabels(1.8e9)).toEqual(['1.8B', '900.0M', '0'])
 })

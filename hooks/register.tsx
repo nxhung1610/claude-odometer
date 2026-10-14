@@ -198,7 +198,7 @@ export const register: Register = on => {
             ))}
             <Text color="inactive">{`${' '.repeat(7)} └${'─'.repeat(bars.length * 2)}`}</Text>
             <Text color="inactive">
-              {`${' '.repeat(10)}${dayLabel(bars[0]?.label ?? '')} … ${dayLabel(bars[bars.length - 1]?.label ?? '')}`}
+              {`${' '.repeat(10)}${dayLabel(days[0] ?? '')} … ${dayLabel(days[days.length - 1] ?? '')}`}
             </Text>
             <Box flexDirection="row">
               {entries.map(([id]) => (
