@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, toneOf } from './format'
+import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, resetsThatFit, toneOf } from './format'
 
 test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(0)).toBe(0)
@@ -51,6 +51,27 @@ test('a cost reads in dollars, and under a cent as less than one cent', () => {
   expect(formatCost(1.236)).toBe('$1.24')
   expect(formatCost(0)).toBe('$0.00')
   expect(formatCost(0.004)).toBe('<$0.01')
+})
+
+test('a count from 999.5k reads in millions, so it never shows as 1000k', () => {
+  expect(compactTokens(999_499)).toBe('999k')
+  expect(compactTokens(999_500)).toBe('1.0M')
+})
+
+test('a window kind the table does not name is cut to eight characters', () => {
+  expect(labelOf('seven_day_opus_extra')).toBe('seven_d…')
+})
+
+test('the last resets go first when the quota line is too wide for them', () => {
+  const windows = [
+    { label: '5h', badge: ' 23% ', reset: '14:20' },
+    { label: '7d', badge: ' 75% ', reset: 'Tue 09:00' },
+    { label: 'spend', badge: ' 40% ', reset: 'Tue 09:00' },
+  ]
+  expect(resetsThatFit(windows, 93, 10, false)).toEqual([true, true, false])
+  expect(resetsThatFit(windows, 101, 10, true)).toEqual([true, true, false])
+  expect(resetsThatFit(windows, 200, 10, false)).toEqual([true, true, true])
+  expect(resetsThatFit([{ label: '5h', badge: ' 23% ', reset: '' }], 93, 10, false)).toEqual([false])
 })
 
 test('the context badge is green under 70%, yellow from 70% and red from 90%', () => {

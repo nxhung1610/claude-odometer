@@ -70,17 +70,19 @@ function quota() {
     { percent: 75, reset: '↻ Tue 09:00', note: '70% to 89%' },
     { percent: 91, reset: '↻ Mon 14:00', note: '90% and up' },
   ]
+  // The card's heading, then one line per window: a bar, a badge and the reset time, as the mod draws them.
+  const heading = line([['◆ ', C.accent], ['quota', C.primary, true]], 52)
   const body = rows
     .map((r, i) => {
-      const y = 66 + i * 44
+      const y = 90 + i * 44
       const n = filled(r.percent)
       const tone = toneOf(r.percent)
       return [
         line(
           [
-            ['  5h ', C.muted],
-            ['▓'.repeat(n), tone],
-            ['░'.repeat(10 - n), C.track],
+            ['5h ', C.muted],
+            ['█'.repeat(n), tone],
+            ['─'.repeat(10 - n), C.track],
             [` ${r.percent}%`, tone, true],
             [`  ${r.reset}`, C.secondary],
           ],
@@ -90,7 +92,7 @@ function quota() {
       ].join('\n')
     })
     .join('\n')
-  return card(560, 176, body)
+  return card(560, 204, `${heading}\n${body}`)
 }
 
 // ---- speed: the light crossing "working" -----------------------------------------

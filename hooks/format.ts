@@ -12,7 +12,7 @@ export type Tone = 'success' | 'warning' | 'error'
 
 /** Short label for a window kind, e.g. `five_hour` to `5h`. */
 export function labelOf(kind: string): string {
-  return LABELS[kind] ?? kind
+  return LABELS[kind] ?? clip(kind, 8)
 }
 
 /** Green under 70%, amber from 70%, red from 90%. */
@@ -41,7 +41,7 @@ export function filledCells(percent: number, width = BAR_WIDTH): number {
 /** The filled and empty runs of the bar, ready to draw in two colors. */
 export function barCells(percent: number, width = BAR_WIDTH) {
   const filled = filledCells(percent, width)
-  return { filled: '▓'.repeat(filled), empty: '░'.repeat(width - filled) }
+  return { filled: '█'.repeat(filled), empty: '─'.repeat(width - filled) }
 }
 
 /** `14:20` when the reset is today, `Mon 14:00` otherwise. Empty when unknown. */
@@ -55,9 +55,25 @@ export function resetLabel(resetsAt: string | undefined, now: Date): string {
   return isToday ? time : `${DAYS[at.getDay()]} ${time}`
 }
 
+/**
+ * Which windows of the quota line keep their reset time. A window takes its label, bar, badge and, while shown, its
+ * reset, with a gap between windows; the line may be `width` cells at most, so the last resets go first until it fits.
+ */
+export function resetsThatFit(windows: { label: string; badge: string; reset: string }[], width: number, barWidth: number, roomy: boolean): boolean[] {
+  const shown = windows.map(window => window.reset !== '')
+  const lineWidth = (): number =>
+    windows.reduce((sum, window, index) => {
+      const gap = index === 0 ? 0 : roomy ? 7 : 3
+      const reset = shown[index] ? (roomy ? 4 : 3) + window.reset.length : 0
+      return sum + gap + window.label.length + 1 + barWidth + window.badge.length + reset
+    }, 0)
+  for (let index = windows.length - 1; index >= 0 && lineWidth() > width; index--) shown[index] = false
+  return shown
+}
+
 /** `364`, `92k`, `1.2M`: a token count in few enough characters to sit on the quota row. */
 export function compactTokens(count: number): string {
-  if (count >= 1e6) return `${(count / 1e6).toFixed(1)}M`
+  if (count >= 999_500) return `${(count / 1e6).toFixed(1)}M`
   if (count >= 1e3) return `${Math.round(count / 1e3)}k`
   return String(Math.round(count))
 }
