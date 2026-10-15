@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, resetsThatFit, toneOf } from './format'
+import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetIn, resetLabel, resetsThatFit, toneOf } from './format'
 
 test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(0)).toBe(0)
@@ -33,6 +33,17 @@ test('a reset today shows the time, another day shows the weekday', () => {
   expect(resetLabel(later, now)).toMatch(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat) 14:00$/)
   expect(resetLabel(undefined, now)).toBe('')
   expect(resetLabel('not a date', now)).toBe('')
+})
+
+test('the time left reads in hours and minutes, or in days and hours from a day away', () => {
+  const now = new Date(2026, 9, 14, 12, 0)
+
+  expect(resetIn(new Date(2026, 9, 14, 14, 20).toISOString(), now)).toBe('2h 20m')
+  expect(resetIn(new Date(2026, 9, 14, 12, 45).toISOString(), now)).toBe('45m')
+  expect(resetIn(new Date(2026, 9, 16, 14, 0).toISOString(), now)).toBe('2d 2h')
+  expect(resetIn(new Date(2026, 9, 14, 11, 0).toISOString(), now)).toBe('0m')
+  expect(resetIn(undefined, now)).toBe('')
+  expect(resetIn('not a date', now)).toBe('')
 })
 
 test('a token count reads in k, or in M from a million', () => {
@@ -74,8 +85,3 @@ test('the last resets go first when the quota line is too wide for them', () => 
   expect(resetsThatFit([{ label: '5h', badge: ' 23% ', reset: '' }], 93, 10, false)).toEqual([false])
 })
 
-test('the context badge is green under 70%, yellow from 70% and red from 90%', () => {
-  expect(pillColorOf(toneOf(69))).toBe('green')
-  expect(pillColorOf(toneOf(70))).toBe('yellow')
-  expect(pillColorOf(toneOf(90))).toBe('red')
-})

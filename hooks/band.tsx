@@ -51,7 +51,7 @@ function quotaWindow(w: QuotaWindow, width: number, now: Date, { Box, Text }: Ba
         <Text size="heading" weight="semibold" tabular color={tone}>{`${percent}%`}</Text>
       </Box>
       <Box flexDirection="row" width={width} height={1}>
-        {filled > 0 ? <Box width={filled} height={1} backgroundColor={tone} /> : null}
+        {filled > 0 ? <Box width={filled} height={1} backgroundColor="claude" /> : null}
         {width > filled ? <Box width={width - filled} height={1} backgroundColor={TRACK} /> : null}
       </Box>
       <Box height={1}>

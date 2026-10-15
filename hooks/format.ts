@@ -22,12 +22,6 @@ export function toneOf(percent: number): Tone {
   return 'success'
 }
 
-/** The background of the context's percentage badge, in the same three steps as its tone. */
-export function pillColorOf(tone: Tone): string {
-  if (tone === 'error') return 'red'
-  if (tone === 'warning') return 'yellow'
-  return 'green'
-}
 
 /** How many of the bar's cells are filled for a percentage. */
 export function filledCells(percent: number, width = BAR_WIDTH): number {
@@ -53,6 +47,21 @@ export function resetLabel(resetsAt: string | undefined, now: Date): string {
   const time = `${pad(at.getHours())}:${pad(at.getMinutes())}`
   const isToday = at.toDateString() === now.toDateString()
   return isToday ? time : `${DAYS[at.getDay()]} ${time}`
+}
+
+/** How long until the reset: `6h 20m`, `45m`, or `1d 21h` from a day away. Empty when unknown, `0m` once it has passed. */
+export function resetIn(resetsAt: string | undefined, now: Date): string {
+  if (!resetsAt) return ''
+  const at = new Date(resetsAt)
+  if (Number.isNaN(at.getTime())) return ''
+
+  const minutes = Math.max(0, Math.floor((at.getTime() - now.getTime()) / 60_000))
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const rest = minutes % 60
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${rest}m`
+  return `${rest}m`
 }
 
 /**

@@ -94,8 +94,8 @@ test('session start reads the rate-limit windows into the quota line', async ($,
   expect(await ui.find({ type: 'Text', text: '5h' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: ' 23%' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: ' 91%' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '↻ 14:20' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /↻ \w{3} 14:00/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '↻ 2h 20m' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '↻ 2d 2h' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -303,23 +303,23 @@ test('session start shows the context card, with a dash before the first respons
   await ui.unmount()
 })
 
-test('the context badge is green below 70%, yellow from 70% and red from 90%', async ($, on) => {
+test('the percentage is green below 70%, yellow from 70% and red from 90%', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000, percent: 69 })
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
   let ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 69% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'green' } }] })
+  expect(await ui.find({ type: 'Text', text: ' 69% ' })).toMatchObject({ children: [{ props: { color: 'success' } }] })
   await ui.unmount()
 
   await $.session.measure({ context: { window: 200_000, percent: 70 }, rateLimits: [], changed: ['context'] })
   ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 70% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'yellow' } }] })
+  expect(await ui.find({ type: 'Text', text: ' 70% ' })).toMatchObject({ children: [{ props: { color: 'warning' } }] })
   await ui.unmount()
 
   await $.session.measure({ context: { window: 200_000, percent: 90 }, rateLimits: [], changed: ['context'] })
   ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 90% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'red' } }] })
+  expect(await ui.find({ type: 'Text', text: ' 90% ' })).toMatchObject({ children: [{ props: { color: 'error' } }] })
   await ui.unmount()
 })
 
@@ -335,7 +335,7 @@ test('a context change moves the card to the new fill', async ($, on) => {
   })
 
   const ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 92% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'red' } }] })
+  expect(await ui.find({ type: 'Text', text: ' 92% ' })).toMatchObject({ children: [{ props: { color: 'error' } }] })
   expect(await ui.find({ type: 'Text', text: ' 30% ' })).toBeUndefined()
   await ui.unmount()
 })
@@ -361,8 +361,43 @@ test('the card shows the tokens against the window, on a narrow band too', async
 
   const ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 60 } })
   expect(await ui.find({ type: 'Text', text: /92k of 200k/ })).toMatchObject({
-    children: [{ props: { dimColor: true } }, { props: { backgroundColor: 'green' }, children: [' 46% '] }],
+    children: [{ props: { dimColor: true } }, { props: { color: 'success' }, children: [' 46% '] }],
   })
+  await ui.unmount()
+})
+
+test('before the first response the card works out the fill from the breakdown, so the parts show at once', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], {
+    window: 200_000,
+    breakdown: {
+      categories: [
+        { name: 'System prompt', tokens: 4_000, kind: 'used' },
+        { name: 'System tools', tokens: 16_000, kind: 'used' },
+        { name: 'Autocompact buffer', tokens: 30_000, kind: 'buffer' },
+        { name: 'Free space', tokens: 150_000, kind: 'free' },
+      ],
+    },
+  })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  // 20k of the 200k window is in use, which is 10%. The 4k of system prompt is 3 of the 136 cells of the bar.
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /^20k of 200k/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^ 10% $/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^█{3}$/ })).toMatchObject({ props: { color: '#3987e5' } })
+  expect(await ui.find({ type: 'Text', text: /Tools 16k 8%/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('with no breakdown yet, the card shows the window and says the parts come after the first response', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: '— of 200k' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'the parts appear after the first response' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -651,9 +686,9 @@ test('on the desktop app the quota windows sit side by side, each with its bar, 
   expect(await ui.find({ type: 'Text', text: /^↻ 14:20$/ })).toBeDefined()
   // Each bar fills its share of its 66 cells: 23% is 15 cells, and 75% is 50.
   expect(barRuns(root)).toEqual([
-    { color: 'success', cells: 15 },
+    { color: 'claude', cells: 15 },
     { color: 'subtle', cells: 51 },
-    { color: 'warning', cells: 50 },
+    { color: 'claude', cells: 50 },
     { color: 'subtle', cells: 16 },
   ])
   await ui.unmount()
@@ -838,9 +873,9 @@ test('on the desktop app a narrow band stacks the quota windows, each as wide as
   expect(drawnWhere(root, el => el.props?.key === 'five_hour')[0].props.width).toBe(56)
   expect(drawnWhere(root, el => el.props?.key === 'seven_day')[0].props.width).toBe(56)
   expect(barRuns(root)).toEqual([
-    { color: 'success', cells: 13 },
+    { color: 'claude', cells: 13 },
     { color: 'subtle', cells: 43 },
-    { color: 'warning', cells: 42 },
+    { color: 'claude', cells: 42 },
     { color: 'subtle', cells: 14 },
   ])
   await ui.unmount()
@@ -858,7 +893,7 @@ test('on the desktop app the band leaves the context out, since the desktop app 
   expect(await ui.find({ type: 'Text', text: /System 10k/ })).toBeUndefined()
   // The one window is as wide as the card inside, 136 cells: 23% of it is 31 cells, and the rest is track.
   expect(barRuns(root)).toEqual([
-    { color: 'success', cells: 31 },
+    { color: 'claude', cells: 31 },
     { color: 'subtle', cells: 105 },
   ])
   await ui.unmount()
@@ -877,7 +912,7 @@ test('on a surface without hover, the card shows the legend under the bar and no
   await ui.unmount()
 })
 
-test('a third window drops its reset when the quota line would not fit the card', async ($, on) => {
+test('at 97 columns every window keeps its reset, since each one reads as the time left', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [
     { kind: 'five_hour', percentUsed: 23, resetsAt: new Date(2026, 9, 14, 14, 20).toISOString() },
@@ -892,7 +927,7 @@ test('a third window drops its reset when the quota line would not fit the card'
   expect(windows).toHaveLength(3)
   expect(JSON.stringify(windows[1])).toContain('↻')
   expect(JSON.stringify(windows[2])).toContain('spend')
-  expect(JSON.stringify(windows[2])).not.toContain('↻')
+  expect(JSON.stringify(windows[2])).toContain('↻ 2d 2h')
   await ui.unmount()
 })
 
@@ -912,7 +947,7 @@ test('a breakdown with no tokens leaves the bar as the fill, not empty', async (
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
   const ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: /^█{63}$/ })).toMatchObject({ props: { color: 'success' } })
+  expect(await ui.find({ type: 'Text', text: /^█{63}$/ })).toMatchObject({ props: { color: 'claude' } })
   await ui.unmount()
 })
 
