@@ -3,7 +3,7 @@ import { atom, read, update } from 'claude-code'
 
 import type { ContextFill, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, compactTokens, formatCost, labelOf, resetLabel, toneOf } from './format'
+import { BAR_WIDTH, barCells, clip, compactTokens, formatCost, labelOf, resetLabel, toneOf } from './format'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
   CHART_ROWS,
@@ -17,7 +17,6 @@ import {
   formatTokens,
   modelName,
   rankEntries,
-  sessionsIn,
   sumModels,
   tokensOf,
 } from './tokens'
@@ -187,27 +186,30 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
 
-    const rows = await read($, windows)
-    const speed = await read($, timing)
-    const nowMs = await $.clock.now()
+    // One round trip for every state read the band needs, since the band redraws ten times a second while a step runs.
+    const [rows, speed, nowMs, frames, fill, modelInUse, spend] = await Promise.all([
+      read($, windows),
+      read($, timing),
+      $.clock.now(),
+      read($, sweep),
+      read($, context),
+      read($, model),
+      read($, cost),
+    ])
     const now = new Date(nowMs)
     const { Box, Text } = $.ui.resolve(e)
     const roomy = e.props.bodyColumns >= 105
     const withReset = e.props.bodyColumns >= 97
     const barWidth = e.props.bodyColumns >= 90 ? BAR_WIDTH : 6
-    const frames = await read($, sweep)
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
     // The context fill is absent until the session's first response, shown as a dash.
-    const fill = await read($, context)
     const ctxPercent = fill?.percent === undefined ? null : Math.round(fill.percent)
     const fillBar = ctxPercent === null ? null : { percent: ctxPercent, cells: barCells(ctxPercent, barWidth), tone: toneOf(ctxPercent) }
     // The tokens need 120 columns: the quota row with them is 107 wide, so a narrower band would wrap it.
     const detail = e.props.bodyColumns >= 120 && fill?.tokens !== undefined ? `${compactTokens(fill.tokens)}/${compactTokens(fill.window)}` : undefined
     const withContext = e.props.bodyColumns >= 70
-    const modelInUse = await read($, model)
-    const spend = await read($, cost)
     const withModel = e.props.bodyColumns >= 90
     const withCost = e.props.bodyColumns >= 100
 
@@ -258,7 +260,7 @@ export const register: Register = on => {
           <Text color="inactive">{'  '}</Text>
           {withModel && modelInUse !== null ? (
             <Box flexDirection="row">
-              <Text color="claude">{modelName(modelInUse.model)}</Text>
+              <Text color="claude">{clip(modelName(modelInUse.model), 18)}</Text>
               <Text color="inactive">{modelInUse.effort === undefined ? ' · ' : ` (${modelInUse.effort}) · `}</Text>
             </Box>
           ) : null}
@@ -289,8 +291,8 @@ export const register: Register = on => {
     const entries = rankEntries(totals)
     const order = entries.map(([id]) => id)
     const grand = entries.reduce((sum, [, t]) => sum + tokensOf(t), 0)
-    const sessions = scan ? sessionsIn(scan, days) : 0
-    const anyUsage = scan ? Object.keys(scan.sessionsByDay).length > 0 : false
+    const sessions = scan ? scan.sessions[selected] : 0
+    const anyUsage = scan ? Object.keys(scan.days).length > 0 : false
     const maxColumns = Math.max(4, Math.min(60, Math.floor((columns - 12) / 2)))
     const bars = scan ? columnsWithSegments(scan, days, order, maxColumns) : []
     const max = Math.max(1, ...bars.map(bar => bar.total))

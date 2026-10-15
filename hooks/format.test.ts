@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
+import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
 
 test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(0)).toBe(0)
@@ -39,6 +39,11 @@ test('a token count reads in k, or in M from a million', () => {
   expect(compactTokens(92_000)).toBe('92k')
   expect(compactTokens(200_000)).toBe('200k')
   expect(compactTokens(1_200_000)).toBe('1.2M')
+})
+
+test('text longer than its limit is cut with an ellipsis', () => {
+  expect(clip('Opus 5.5', 18)).toBe('Opus 5.5')
+  expect(clip('anthropic.claude-3-5-sonnet-20240620-v1:0', 18)).toBe('anthropic.claude-…')
 })
 
 test('a cost reads in dollars, and under a cent as less than one cent', () => {

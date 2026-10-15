@@ -16,12 +16,12 @@ export type ModelTokens = {
 }
 
 /**
- * What the transcript scan found: the projects folder it read, per local day (YYYY-MM-DD) the ids of the sessions
- * with usage that day, and each model's tokens.
+ * What the transcript scan found: the projects folder it read, how many sessions had usage in each range, and each
+ * model's tokens per local day (YYYY-MM-DD).
  */
 export type TokenScan = {
   root: string
-  sessionsByDay: Record<string, string[]>
+  sessions: Record<TokenRange, number>
   days: Record<string, Record<string, ModelTokens>>
 }
 
