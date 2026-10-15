@@ -13,7 +13,7 @@ A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a l
 **Speed.** The row beneath the quota shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The row starts with that model and its effort, and on a wide band ends with the session's cost, as `/cost` totals it.
 ![While a step runs, a light moves across the word working, one letter at a time](docs/speed.svg)
 
-**`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data.
+**`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data. Below the chart, a heatmap shows when tokens were used, by weekday and hour, in local time.
 
 ![The /tokens pane: a stacked column chart of tokens per day, with a legend for Opus, Sonnet and Haiku](docs/tokens.svg)
 

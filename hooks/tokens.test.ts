@@ -12,6 +12,8 @@ import {
   dayLabel,
   formatShare,
   formatTokens,
+  heatCell,
+  hourGrid,
   modelName,
   rankEntries,
   sumModels,
@@ -20,6 +22,7 @@ import {
 const SCAN: TokenScan = {
   root: '/home/me/.claude/projects',
   sessions: { week: 2, month: 2, all: 2 },
+  hours: {},
   days: {
     '2026-10-12': { 'claude-haiku-5-5': { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 } },
     '2026-10-13': {
@@ -153,6 +156,24 @@ test('a day with any usage draws at least one level, even beside a much busier d
 
 test('the axis reads top, middle and bottom', () => {
   expect(axisLabels(1.8e9)).toEqual(['1.8B', '900.0M', '0'])
+})
+
+/** A day's hours, with tokens in one hour only. */
+const atHour = (hour: number, tokens: number) => Array.from({ length: 24 }, (_, h) => (h === hour ? tokens : 0))
+
+test('the heatmap counts each day toward its weekday, Monday first', () => {
+  const scan: TokenScan = { ...SCAN, hours: { '2026-10-12': atHour(9, 100), '2026-10-13': atHour(9, 50) } }
+  const grid = hourGrid(scan, ['2026-10-12', '2026-10-13'])
+  expect(grid[0]?.[9]).toBe(100) // 2026-10-12 is a Monday
+  expect(grid[1]?.[9]).toBe(50)
+  expect(hourGrid(scan, ['2026-10-13'])[0]?.[9]).toBe(0)
+})
+
+test('a heatmap cell takes a shade by its share of the largest cell', () => {
+  expect(heatCell(0, 100).char).toBe('·')
+  expect(heatCell(1, 100).char).toBe('░')
+  expect(heatCell(50, 100).char).toBe('▒')
+  expect(heatCell(100, 100).char).toBe('█')
 })
 
 test('each model has its own color, none of them a status color', () => {

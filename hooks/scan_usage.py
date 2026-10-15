@@ -2,7 +2,8 @@
 
 Prints one JSON object:
   {"root": "<projects folder read>", "sessions": {"week": n, "month": n, "all": n},
-   "days": {"YYYY-MM-DD": {model: {input, output, cacheRead, cacheWrite}}}}
+   "days": {"YYYY-MM-DD": {model: {input, output, cacheRead, cacheWrite}}},
+   "hours": {"YYYY-MM-DD": [24 token totals, one per local hour]}}
 
 A session counts in a range when it had usage, its own or its sub-agents', on a day in that
 range: the last 7 days and the last 30 days, both counting today, and all days up to today.
@@ -38,12 +39,13 @@ FIELDS = {
 }
 
 
-def local_day(stamp):
+def local_moment(stamp):
+    """The local time a transcript timestamp names, or None when it does not read as a time."""
     try:
         when = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return when.astimezone().date().isoformat()
+    return when.astimezone()
 
 
 def count(value):
@@ -92,6 +94,7 @@ def summarize(paths, root=ROOT, today=None):
     seen = set()
     session_days = {}
     days = {}
+    hours = {}
     for path in paths:
         with open(path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
@@ -111,9 +114,10 @@ def summarize(paths, root=ROOT, today=None):
                     continue
                 if not isinstance(stamp, str):
                     continue
-                day = local_day(stamp)
-                if day is None:
+                moment = local_moment(stamp)
+                if moment is None:
                     continue
+                day = moment.date().isoformat()
                 # A session counts once a day, however many of its transcripts had usage that day, so the
                 # count does not depend on the file order.
                 owner = owning_session(path, root)
@@ -128,10 +132,13 @@ def summarize(paths, root=ROOT, today=None):
                 tally = days.setdefault(day, {}).setdefault(model, dict.fromkeys(FIELDS, 0))
                 for key, field in FIELDS.items():
                     tally[key] += count(usage.get(field))
+                # The same response, counted once, at the hour it was written in local time.
+                hours.setdefault(day, [0] * 24)[moment.hour] += sum(count(usage.get(field)) for field in FIELDS.values())
     return {
         "root": root,
         "sessions": sessions_in_ranges(session_days, today or datetime.date.today()),
         "days": days,
+        "hours": hours,
     }
 
 
