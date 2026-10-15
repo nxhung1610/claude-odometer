@@ -34,13 +34,35 @@ class ScanUsageTest(unittest.TestCase):
         with open(file, "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines))
 
-    def scan(self):
-        """Runs the scanner with the fake home and reads what it prints."""
-        env = dict(os.environ, HOME=self.home.name, USERPROFILE=self.home.name)
+    def scan(self, **extra):
+        """Runs the scanner with the fake home and reads what it prints. CLAUDE_CONFIG_DIR is left out of the
+        environment, so a developer's own setting cannot move the folder the tests read."""
+        env = {key: value for key, value in os.environ.items() if key != "CLAUDE_CONFIG_DIR"}
+        env.update(HOME=self.home.name, USERPROFILE=self.home.name, **extra)
         ran = subprocess.run(
             [sys.executable, "-I", SCRIPT], env=env, capture_output=True, text=True, check=True
         )
         return json.loads(ran.stdout)
+
+    def test_claude_config_dir_moves_the_projects_folder(self):
+        custom = os.path.join(self.home.name, "custom-config")
+        file = os.path.join(custom, "projects", "project", "session-1.jsonl")
+        os.makedirs(os.path.dirname(file), exist_ok=True)
+        with open(file, "w", encoding="utf-8") as handle:
+            handle.write(reply("msg_1", "claude-opus-5-5", {"input_tokens": 9}))
+        # The default folder holds other usage, which the scan must not read once the variable points away.
+        self.write("project/session-1.jsonl", reply("msg_2", "claude-opus-5-5", {"input_tokens": 1}))
+
+        scan = self.scan(CLAUDE_CONFIG_DIR=custom)
+        self.assertEqual(scan["root"], os.path.join(custom, "projects"))
+        self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 9)
+
+    def test_an_empty_claude_config_dir_falls_back_to_the_default_folder(self):
+        self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 4}))
+
+        scan = self.scan(CLAUDE_CONFIG_DIR="")
+        self.assertEqual(scan["root"], os.path.join(self.home.name, ".claude", "projects"))
+        self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 4)
 
     def test_a_response_written_once_per_content_block_counts_once_across_files(self):
         self.write(
@@ -77,7 +99,7 @@ class ScanUsageTest(unittest.TestCase):
             {DAY: {"claude-opus-5-5": {"input": 4, "output": 0, "cacheRead": 0, "cacheWrite": 0}}},
         )
 
-    def test_sessions_counts_session_transcripts_that_had_usage(self):
+    def test_sessions_by_day_lists_the_session_transcripts_that_had_usage(self):
         self.write("project/session-a.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, session="session-a"))
         self.write(
             "project/session-a/subagents/agent-x.jsonl",
@@ -95,9 +117,44 @@ class ScanUsageTest(unittest.TestCase):
         )
 
         scan = self.scan()
-        self.assertEqual(scan["sessions"], 2)
+        self.assertEqual(scan["sessionsByDay"], {DAY: ["session-a", "session-b"]})
         # Sub-agent tokens still count toward the days: four responses, one input token each.
         self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 4)
+
+    def test_a_session_with_usage_on_two_days_is_listed_on_both(self):
+        first = datetime.datetime.fromisoformat("2026-10-12T12:00:00+00:00").astimezone().date().isoformat()
+        second = datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
+        self.write(
+            "project/session-1.jsonl",
+            reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, timestamp="2026-10-12T12:00:00Z"),
+            reply("msg_2", "claude-opus-5-5", {"input_tokens": 1}, timestamp="2026-10-13T12:00:00Z"),
+        )
+
+        self.assertEqual(self.scan()["sessionsByDay"], {first: ["session-1"], second: ["session-1"]})
+
+    def test_a_sub_agent_adds_its_session_on_the_day_of_its_usage(self):
+        first = datetime.datetime.fromisoformat("2026-10-12T12:00:00+00:00").astimezone().date().isoformat()
+        second = datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
+        self.write(
+            "project/session-1.jsonl",
+            reply("msg_1", "claude-opus-5-5", {"input_tokens": 5}, timestamp="2026-10-12T12:00:00Z"),
+        )
+        self.write(
+            "project/session-1/subagents/agent-x.jsonl",
+            reply("msg_2", "claude-opus-5-5", {"input_tokens": 7}, session="agent-x", timestamp="2026-10-13T12:00:00Z"),
+        )
+
+        scan = self.scan()
+        self.assertEqual(scan["sessionsByDay"], {first: ["session-1"], second: ["session-1"]})
+        self.assertEqual(scan["days"][second]["claude-opus-5-5"]["input"], 7)
+
+    def test_a_sub_agent_counts_toward_its_session_when_the_session_file_is_missing(self):
+        self.write(
+            "project/session-9/subagents/agent-z.jsonl",
+            reply("msg_3", "claude-opus-5-5", {"input_tokens": 3}, session="agent-z"),
+        )
+
+        self.assertEqual(self.scan()["sessionsByDay"], {DAY: ["session-9"]})
 
 
 class SummarizeTest(unittest.TestCase):
@@ -151,7 +208,7 @@ class SummarizeTest(unittest.TestCase):
         for order in ([sub_agent, main], [main, sub_agent]):
             with self.subTest(order=order):
                 summary = scan_usage.summarize(order, root=self.root.name)
-                self.assertEqual(summary["sessions"], 1)
+                self.assertEqual(summary["sessionsByDay"], {DAY: ["session-1"]})
                 self.assertEqual(summary["days"][DAY]["claude-opus-5-5"]["input"], 1)
 
 

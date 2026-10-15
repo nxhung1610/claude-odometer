@@ -14,11 +14,13 @@ import {
   formatTokens,
   modelName,
   rankEntries,
+  sessionsIn,
   sumModels,
 } from './tokens'
 
 const SCAN: TokenScan = {
-  sessions: 2,
+  root: '/home/me/.claude/projects',
+  sessionsByDay: { '2026-10-12': ['session-a'], '2026-10-13': ['session-a', 'session-b'] },
   days: {
     '2026-10-12': { 'claude-haiku-5-5': { input: 1, output: 2, cacheRead: 3, cacheWrite: 4 } },
     '2026-10-13': {
@@ -88,6 +90,20 @@ test('sums per model, ranked by total', () => {
   expect(totals['claude-haiku-5-5']?.input).toBe(11)
   expect(totals['claude-haiku-5-5']?.cacheWrite).toBe(44)
   expect(rankEntries(totals).map(([id]) => id)).toEqual(['claude-haiku-5-5', 'claude-sonnet-5-5'])
+})
+
+test('a session with usage on several days counts once in a range', () => {
+  expect(sessionsIn(SCAN, ['2026-10-12', '2026-10-13'])).toBe(2)
+  expect(sessionsIn(SCAN, ['2026-10-12'])).toBe(1)
+  expect(sessionsIn(SCAN, ['2026-10-14'])).toBe(0)
+})
+
+test('a model with no tokens in the range is left out of the ranking', () => {
+  const totals = {
+    'claude-sonnet-5-5': { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    'claude-haiku-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 },
+  }
+  expect(rankEntries(totals).map(([id]) => id)).toEqual(['claude-haiku-5-5'])
 })
 
 test('each column carries its models in the order given', () => {

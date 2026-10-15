@@ -57,7 +57,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 - `session.measure` updates them when the engine reports a change in a window.
 - `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, and the model's speed on the row beneath. The band yields while a survey holds it.
 - `turn.step` times each model step. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
-- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `~/.claude/projects`. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus a count of sessions; it sends nothing anywhere.
+- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `$CLAUDE_CONFIG_DIR/projects`, or in `~/.claude/projects` when that variable is unset or empty. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus, per day, the session ids (the transcript names), with a sub-agent's usage under the session that spawned it, so each range can count its sessions; it sends nothing anywhere.
 
 ## Files
 

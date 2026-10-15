@@ -17,6 +17,7 @@ import {
   formatTokens,
   modelName,
   rankEntries,
+  sessionsIn,
   sumModels,
   tokensOf,
 } from './tokens'
@@ -76,9 +77,11 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const reading = await $.session.usage()
     await update($, windows, () => reading.rateLimits)
+    // Runs at once when typed mid-turn: it reads the transcripts on disk, not the turn's state.
     await $.command.register({
       name: 'tokens',
       description: 'Show tokens per day, by model, in a pane',
+      immediate: true,
     })
 
     return next(e)
@@ -125,7 +128,7 @@ export const register: Register = on => {
   })
 
   // Opens the pane first, then runs the scanner the mod ships. Only per-day
-  // token counts come back; no message text is kept.
+  // token counts and session ids come back; no message text is kept.
   on('command.run', { command: 'tokens' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Tokens per day' })
     await update($, tokens, () => ({ status: 'scanning' as const }))
@@ -229,6 +232,8 @@ export const register: Register = on => {
     const entries = rankEntries(totals)
     const order = entries.map(([id]) => id)
     const grand = entries.reduce((sum, [, t]) => sum + tokensOf(t), 0)
+    const sessions = scan ? sessionsIn(scan, days) : 0
+    const anyUsage = scan ? Object.keys(scan.sessionsByDay).length > 0 : false
     const maxColumns = Math.max(4, Math.min(60, Math.floor((columns - 12) / 2)))
     const bars = scan ? columnsWithSegments(scan, days, order, maxColumns) : []
     const max = Math.max(1, ...bars.map(bar => bar.total))
@@ -260,7 +265,10 @@ export const register: Register = on => {
         {state.status === 'failed' ? (
           <Text color="error">{`Could not read the transcripts: ${state.reason}`}</Text>
         ) : null}
-        {scan && grand === 0 ? <Text color="inactive">No tokens in this range.</Text> : null}
+        {scan && grand === 0 && anyUsage ? <Text color="inactive">No tokens in this range.</Text> : null}
+        {scan && grand === 0 && !anyUsage ? (
+          <Text color="inactive">{`No transcripts with usage found in ${scan.root}.`}</Text>
+        ) : null}
         {scan && grand > 0 ? (
           <Box flexDirection="column">
             {grid.map((line, row) => (
@@ -295,7 +303,7 @@ export const register: Register = on => {
               )
             })}
             <Text color="inactive">
-              {`${formatTokens(grand)} tokens across ${scan.sessions} sessions. Each API response is counted once; /stats adds every log row.`}
+              {`${formatTokens(grand)} tokens across ${sessions} ${sessions === 1 ? 'session' : 'sessions'}. Each API response is counted once; /stats adds every log row.`}
             </Text>
           </Box>
         ) : null}

@@ -15,9 +15,13 @@ export type ModelTokens = {
   cacheWrite: number
 }
 
-/** What the transcript scan found: the sessions read, and per local day (YYYY-MM-DD) each model's tokens. */
+/**
+ * What the transcript scan found: the projects folder it read, per local day (YYYY-MM-DD) the ids of the sessions
+ * with usage that day, and each model's tokens.
+ */
 export type TokenScan = {
-  sessions: number
+  root: string
+  sessionsByDay: Record<string, string[]>
   days: Record<string, Record<string, ModelTokens>>
 }
 
