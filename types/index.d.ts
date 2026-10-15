@@ -51,6 +51,25 @@ export type ModelSpeed = {
   tps?: number
 }
 
+/**
+ * The live context window: its size in tokens, and its fill once a response of the window has reported one.
+ * The fill is absent in a fresh session, and after a compaction until the next response.
+ */
+export type ContextFill = {
+  /** Input tokens the last response was answered over, once the window has reported them. */
+  tokens?: number
+  /** The context window's size, in tokens. */
+  window: number
+  /** The fill as a whole percentage, once a response of the window has reported one. */
+  percent?: number
+}
+
+/** The model the latest main-conversation step asked for, and the effort it was given, when its model has one. */
+export type ModelInUse = {
+  model: string
+  effort?: string
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'odometer': {
@@ -60,8 +79,12 @@ declare module 'claude-code' {
       timing: ModelSpeed | null
       /** Frames drawn while a model step runs; the light on the word `working` moves with it. */
       sweep: number
-      /** The context window's fill as a whole percentage, once a response of the live window reported one. */
-      context: number | null
+      /** The live context window, shown at the end of the quota row. */
+      context: ContextFill | null
+      /** The model the latest main-conversation step asked for, shown at the start of the speed row. */
+      model: ModelInUse | null
+      /** The session's cost in US dollars, shown at the end of the speed row. */
+      cost: number | null
     }
   }
 }

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, filledCells, labelOf, resetLabel, toneOf } from './format'
+import { barCells, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
 
 test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(0)).toBe(0)
@@ -33,4 +33,16 @@ test('a reset today shows the time, another day shows the weekday', () => {
   expect(resetLabel(later, now)).toMatch(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat) 14:00$/)
   expect(resetLabel(undefined, now)).toBe('')
   expect(resetLabel('not a date', now)).toBe('')
+})
+
+test('a token count reads in k, or in M from a million', () => {
+  expect(compactTokens(92_000)).toBe('92k')
+  expect(compactTokens(200_000)).toBe('200k')
+  expect(compactTokens(1_200_000)).toBe('1.2M')
+})
+
+test('a cost reads in dollars, and under a cent as less than one cent', () => {
+  expect(formatCost(1.236)).toBe('$1.24')
+  expect(formatCost(0)).toBe('$0.00')
+  expect(formatCost(0.004)).toBe('<$0.01')
 })

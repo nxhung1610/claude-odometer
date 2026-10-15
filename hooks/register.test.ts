@@ -38,16 +38,16 @@ const SCAN = {
 
 type RateWindow = { kind: string; percentUsed: number; resetsAt?: string }
 
-type ContextReading = { window: number; percent?: number }
+type ContextReading = { window: number; percent?: number; tokens?: number }
 
 /**
  * What the engine answers beneath the mod, which a test gives itself: a session
  * with these rate-limit windows, and the commands and panes the mod registers
  * and opens. Each command the mod registers is pushed onto `commands`.
  */
-function engine(on: On, rateLimits: RateWindow[] = [], commands: CommandSpec[] = [], context: ContextReading = { window: 200_000 }) {
+function engine(on: On, rateLimits: RateWindow[] = [], commands: CommandSpec[] = [], context: ContextReading = { window: 200_000 }, spend?: number) {
   on('session.start', () => ({ cwd: '/tmp' }))
-  on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context, rateLimits } }))
+  on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context, rateLimits, cost: spend === undefined ? undefined : { usd: spend } } }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('command.register', (_, e) => {
     commands.push(e)
@@ -287,7 +287,7 @@ test('a wide band draws the quota with a 10-cell bar', async ($, on) => {
   await ui.unmount()
 })
 
-test('session start shows the context fill on the speed row, with a dash before the first response', async ($, on) => {
+test('session start shows the context fill on the quota row, with a dash before the first response', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on)
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
@@ -318,7 +318,7 @@ test('the context fill is green below 70%, amber from 70% and red from 90%', asy
   await ui.unmount()
 })
 
-test('a context change moves the speed row to the new fill', async ($, on) => {
+test('a context change moves the quota row to the new fill', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000, percent: 30 })
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
@@ -346,6 +346,20 @@ test('the context fill shows from 70 columns, and stays off below', async ($, on
 
   ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 70 } })
   expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('on a wide band the context fill shows its tokens against the window', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000, percent: 46, tokens: 92_000 })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  let ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 120 } })
+  expect(await ui.find({ type: 'Text', text: /92k\/200k/ })).toBeDefined()
+  await ui.unmount()
+
+  ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 119 } })
+  expect(await ui.find({ type: 'Text', text: /92k/ })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -531,4 +545,60 @@ test("a sub-agent's step alone leaves the speed row at its dashes", async ($, on
   expect(await ui.find({ type: 'Text', text: /working/ })).toBeUndefined()
   await ui.unmount()
   await stopStep(sub)
+})
+
+const OPUS: TurnStepInput = { ...MAIN, model: 'claude-opus-5-5', effort: 'high' }
+
+test('the speed row names the model that last answered, with its effort', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 5000, outputTokens: 100 }))
+
+  const step = $.turn.step(OPUS)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  await stopStep(step)
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /Opus 5\.5/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\(high\)/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the model and the cost leave the speed row on a narrow band', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000 }, 1.236)
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 5000, outputTokens: 100 }))
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const step = $.turn.step(OPUS)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  await stopStep(step)
+
+  let ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 89 } })
+  expect(await ui.find({ type: 'Text', text: /Opus/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /\$1\.24/ })).toBeUndefined()
+  await ui.unmount()
+
+  ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 100 } })
+  expect(await ui.find({ type: 'Text', text: /Opus/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\$1\.24/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a cost change moves the figure on the speed row', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000 }, 1.236)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  await $.session.measure({ context: { window: 200_000 }, rateLimits: [], cost: { usd: 2.5 }, changed: ['cost'] })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /\$2\.50/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\$1\.24/ })).toBeUndefined()
+  await ui.unmount()
 })
