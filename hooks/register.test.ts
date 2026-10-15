@@ -606,34 +606,66 @@ const CONTEXT_IN_USE: ContextReading = {
   },
 }
 
-test('the context bar takes one colour per group in use, and the free space a thin line', async ($, on) => {
+/** Every element of a drawing that `match` accepts, in document order. */
+function drawnWhere(node: any, match: (element: any) => boolean, found: any[] = []): any[] {
+  if (!node || typeof node !== 'object') return found
+  if (match(node)) found.push(node)
+  for (const child of node.children ?? []) drawnWhere(child, match, found)
+  return found
+}
+
+/** The solid bars of a drawing, in order: each Box one row high with a colour, as its colour and width in cells. */
+function barRuns(root: any): { color: string; cells: number }[] {
+  return drawnWhere(root, el => el.type === 'Box' && el.props?.height === 1 && el.props?.backgroundColor !== undefined).map(el => ({
+    color: el.props.backgroundColor,
+    cells: el.props.width,
+  }))
+}
+
+test('the context bar takes one colour per group in use, and the free space a track', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], CONTEXT_IN_USE)
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
   // At 140 columns the bar is 136 cells: 7 for the system prompt, 48 for messages, and 81 of free space.
+  const terminal = await $.ui.mount(QUOTA)
+  expect(await terminal.find({ type: 'Text', text: /^█{7}$/ })).toMatchObject({ props: { color: '#3987e5' } })
+  expect(await terminal.find({ type: 'Text', text: /^█{48}$/ })).toMatchObject({ props: { color: '#d56aa0' } })
+  expect(await terminal.find({ type: 'Text', text: /^─{81}$/ })).toMatchObject({ props: { color: 'subtle' } })
+  await terminal.unmount()
+
+  // On the desktop app each part is a box of solid colour, one row high.
   const ui = await $.ui.mount({ ...QUOTA, surface: 'desktop' })
-  expect(await ui.find({ type: 'Text', text: '█'.repeat(7) })).toMatchObject({ props: { color: '#3987e5' } })
-  expect(await ui.find({ type: 'Text', text: '█'.repeat(48) })).toMatchObject({ props: { color: '#d56aa0' } })
-  expect(await ui.find({ type: 'Text', text: '─'.repeat(81) })).toMatchObject({ props: { color: 'subtle' } })
-  expect(await ui.find({ type: 'Text', text: '10k' })).toBeDefined() // the legend gives each group's tokens
+  expect(barRuns(await ui.drawn())).toEqual([
+    { color: '#3987e5', cells: 7 },
+    { color: '#d56aa0', cells: 48 },
+    { color: 'subtle', cells: 81 },
+  ])
   await ui.unmount()
 })
 
-test('the bars are set in the code font, so a glyph fills the cell the layout counts for it, on every surface', async ($, on) => {
+test('on the desktop app the quota windows sit side by side, each with its bar, its percentage and its reset', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
-  engine(on, [{ kind: 'five_hour', percentUsed: 23 }], [], CONTEXT_IN_USE)
+  engine(on, [
+    { kind: 'five_hour', percentUsed: 23, resetsAt: new Date(2026, 9, 14, 14, 20).toISOString() },
+    { kind: 'seven_day', percentUsed: 75, resetsAt: new Date(2026, 9, 16, 14, 0).toISOString() },
+  ])
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ ...QUOTA, surface })
-    // Anchored, so a query finds the run itself and not the Text that holds the whole bar on the terminal.
-    expect(await ui.find({ type: 'Text', text: /^██$/ })).toMatchObject({ props: { mono: true } }) // the quota: 23% of its 10 cells
-    expect(await ui.find({ type: 'Text', text: /^─{8}$/ })).toMatchObject({ props: { mono: true } })
-    expect(await ui.find({ type: 'Text', text: /^█{7}$/ })).toMatchObject({ props: { mono: true } }) // the system prompt's part
-    expect(await ui.find({ type: 'Text', text: /^─{81}$/ })).toMatchObject({ props: { mono: true } }) // the free space
-    await ui.unmount()
-  }
+  // At 140 columns the card is 136 cells inside: two windows of 66 cells, with 4 cells between them.
+  const ui = await $.ui.mount({ ...QUOTA, surface: 'desktop' })
+  const root: any = await ui.drawn()
+  expect(await ui.find({ type: 'Text', text: /^23%$/ })).toMatchObject({ props: { size: 'heading', color: 'success' } })
+  expect(await ui.find({ type: 'Text', text: /^75%$/ })).toMatchObject({ props: { size: 'heading', color: 'warning' } })
+  expect(await ui.find({ type: 'Text', text: /^↻ 14:20$/ })).toBeDefined()
+  // Each bar fills its share of its 66 cells: 23% is 15 cells, and 75% is 50.
+  expect(barRuns(root).slice(0, 4)).toEqual([
+    { color: 'success', cells: 15 },
+    { color: 'subtle', cells: 51 },
+    { color: 'warning', cells: 50 },
+    { color: 'subtle', cells: 16 },
+  ])
+  await ui.unmount()
 })
 
 test('the tokens pane says how much context is in use, and what it holds', async ($, on) => {
@@ -665,6 +697,62 @@ test('a new session starts the speed row afresh, without the last model', async 
   const ui = await $.ui.mount(QUOTA)
   expect(await ui.find({ type: 'Text', text: /Opus/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /TTFT —/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('on the desktop app the tokens pane shows the total in large type, and each model as a bar of its share', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  withPython(on, () => ran(0, JSON.stringify(SCAN)))
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount({ ...TOKENS_PANE, surface: 'desktop' })
+  const root: any = await ui.drawn()
+  expect(await ui.find({ type: 'Text', text: /^360$/ })).toMatchObject({ props: { size: 'heading' } })
+  expect(await ui.find({ type: 'Text', text: /^tokens across 2 sessions$/ })).toBeDefined()
+  // The one model has every token of the range, so its bar fills the whole of its track.
+  expect(drawnWhere(root, el => el.type === 'Box' && el.props?.backgroundColor === '#d95926' && el.props?.flexGrow === 100)).toHaveLength(1)
+  expect(drawnWhere(root, el => el.type === 'Button' && el.props?.label === 'Last 7 days')[0].props.variant).toBe('primary')
+  await ui.unmount()
+})
+
+test('on the desktop app the chart stacks each day as solid columns, and the heatmap shades each hour by its share of the busiest', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  const hours = Array.from({ length: 24 }, (_, hour) => (hour === 9 ? 1000 : hour === 15 ? 500 : hour === 20 ? 100 : 0))
+  withPython(on, () => ran(0, JSON.stringify({ ...SCAN, hours: { [TODAY]: hours } })))
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount({ ...TOKENS_PANE, surface: 'desktop' })
+  const root: any = await ui.drawn()
+  // Today is the largest day, so its model fills the whole height of the chart.
+  expect(drawnWhere(root, el => el.type === 'Box' && el.props?.backgroundColor === '#d95926' && el.props?.flexGrow === 1000)).toHaveLength(1)
+  // Wednesday is today: the busiest hour takes the full colour, half of it the second step, a tenth the first.
+  const wednesday = drawnWhere(root, el => el.props?.key === 'Wed')[0]
+  const cells = wednesday.children.slice(1).map((cell: any) => cell.props.backgroundColor)
+  expect(cells[9]).toBe('#d77757')
+  expect(cells[15]).toBe('#d7775780')
+  expect(cells[20]).toBe('#d7775740')
+  expect(cells[0]).toBe('subtle')
+  await ui.unmount()
+})
+
+test('on the desktop app the context now is one bar, each part as wide as its share of the window', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], CONTEXT_IN_USE)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount({ ...TOKENS_PANE, surface: 'desktop' })
+  const root: any = await ui.drawn()
+  expect(await ui.find({ type: 'Text', text: /^80k of 200k$/ })).toBeDefined()
+  // Of the 200k window, the 10k of system prompt is 50 parts in 1,000, the 70k of messages 350, and the 120k free 600.
+  expect(drawnWhere(root, el => String(el.props?.key ?? '').startsWith('part-')).map(el => [el.props.backgroundColor, el.props.flexGrow])).toEqual([
+    ['#3987e5', 50],
+    ['#d56aa0', 350],
+    ['subtle', 600],
+  ])
   await ui.unmount()
 })
 
@@ -745,21 +833,39 @@ test('the quota is the first row of the context card, and the speed row sits abo
   await ui.unmount()
 })
 
-test('each part of the bar is a keyed box with its own tooltip, shown while the pointer is on that part', async ($, on) => {
+test('on the desktop app a narrow band stacks the quota windows, each as wide as the card', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [
+    { kind: 'five_hour', percentUsed: 23 },
+    { kind: 'seven_day', percentUsed: 75 },
+  ])
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  // At 60 columns the card is 56 cells inside, too narrow for two windows side by side.
+  const ui = await $.ui.mount({ ...QUOTA, surface: 'desktop', props: { ...BAND, bodyColumns: 60 } })
+  const root: any = await ui.drawn()
+  expect(drawnWhere(root, el => el.props?.key === 'five_hour')[0].props.width).toBe(56)
+  expect(drawnWhere(root, el => el.props?.key === 'seven_day')[0].props.width).toBe(56)
+  expect(barRuns(root).slice(0, 4)).toEqual([
+    { color: 'success', cells: 13 },
+    { color: 'subtle', cells: 43 },
+    { color: 'warning', cells: 42 },
+    { color: 'subtle', cells: 14 },
+  ])
+  await ui.unmount()
+})
+
+test('on the desktop app the breakdown lists under the bar, so nothing waits on a hover', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], CONTEXT_IN_USE)
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
   const ui = await $.ui.mount({ ...QUOTA, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /System 10k/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Messages 70k/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Free 120k/ })).toBeDefined()
   const root: any = await ui.drawn()
-  const parts = root.children[1].children[2].children
-  expect(parts.map((part: any) => part.props.key)).toEqual(['part-0', 'part-1', 'part-2'])
-  const [system, messages, free] = parts
-  expect(system.children[1].props).toMatchObject({ position: 'absolute', display: 'none' })
-  expect(system.children[1].hover).toEqual({ display: 'flex' })
-  expect(JSON.stringify(system.children[1])).toContain('System')
-  expect(JSON.stringify(messages)).toContain('Messages')
-  expect(JSON.stringify(free)).toContain('Free')
+  expect(JSON.stringify(root)).not.toContain('absolute')
   await ui.unmount()
 })
 
