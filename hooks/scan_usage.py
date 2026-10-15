@@ -24,7 +24,7 @@ import sys
 
 def projects_root():
     """Claude Code's projects folder: $CLAUDE_CONFIG_DIR/projects, or ~/.claude/projects when that is unset or empty."""
-    config = os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude"
+    config = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
     return os.path.join(os.path.expanduser(config), "projects")
 
 
