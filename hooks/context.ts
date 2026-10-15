@@ -69,11 +69,8 @@ export function allocateCells(cells: number, weights: number[]): number[] {
   return parts
 }
 
-/**
- * One part of the bar: `cells` copies of `glyph`, in `color`. A part that stands for a group, the buffer or the
- * free space also names itself and its tokens, which its tooltip shows.
- */
-export type BarRun = { color: string; glyph: string; cells: number; label?: string; tokens?: number }
+/** One part of the bar: `cells` copies of `glyph`, in `color`. */
+export type BarRun = { color: string; glyph: string; cells: number }
 
 /**
  * The window as one bar of `width` cells, from left to right: each group in use in its colour, then the buffer,
@@ -96,7 +93,7 @@ export function contextBar(rows: ContextRow[], width: number): BarRun[] {
     }
   })
   return parts
-    .map((part, index) => ({ label: part.label, color: part.color, glyph: part.glyph, tokens: part.tokens, cells: cells[index] ?? 0 }))
+    .map((part, index) => ({ color: part.color, glyph: part.glyph, cells: cells[index] ?? 0 }))
     .filter(run => run.cells > 0)
 }
 
@@ -127,7 +124,7 @@ export function shareOf(tokens: number, window: number): string {
   return `${Math.round(percent)}%`
 }
 
-/** One part as its tooltip writes it, e.g. `■ System 10k 5%`. */
+/** One legend item as the legend writes it, e.g. `■ System 10k 5%`: the width `packLegend` fits it into a line. */
 export function legendText(item: LegendItem, window: number): string {
   return `${item.glyph} ${item.label} ${compactTokens(item.tokens)} ${shareOf(item.tokens, window)}`
 }

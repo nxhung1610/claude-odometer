@@ -4,8 +4,10 @@ import { atom, read, update } from 'claude-code'
 import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
 import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, resetsThatFit, toneOf } from './format'
-import { LEGEND_SPLIT, contextBar, contextLegend, legendText, packLegend, shareOf } from './context'
+import { LEGEND_SPLIT, contextBar, contextLegend, packLegend, shareOf } from './context'
 import type { BarRun } from './context'
+import { desktopBand } from './band'
+import { desktopPane } from './pane'
 import { contextAlert, limitAlert, minutesToFull, passed } from './alerts'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
@@ -259,6 +261,24 @@ export const register: Register = on => {
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
+    // On the desktop app the band has its own drawing: solid bars, with the legend under the context bar.
+    if (e.surface === 'desktop') {
+      return desktopBand(
+        {
+          columns: e.props.bodyColumns,
+          now,
+          windows: rows,
+          fill,
+          breakdown: ctxRows ?? [],
+          model: e.props.bodyColumns >= 90 ? modelInUse : null,
+          cost: e.props.bodyColumns >= 100 ? spend : null,
+          speed: line,
+          running: running !== null,
+          lit,
+        },
+        { Box, Text },
+      )
+    }
     // The card is the band's width less its border and padding. The fill is absent until the session's
     // first response, and again after a compaction: then the card shows a dash and an empty bar.
     const inner = e.props.bodyColumns - 4
@@ -276,22 +296,8 @@ export const register: Register = on => {
     // The parts of the window, once the breakdown has tokens to show: an all-zero breakdown would leave the bar empty.
     const rowBar: BarRun[] = ctxPercent === null ? [] : contextBar(breakdown, inner)
     const bar: BarRun[] = rowBar.length > 0 ? rowBar : fillBar
-    // Hovering a part shows its tooltip on a surface with hover (the desktop app); elsewhere the legend sits under the bar.
-    const hoverTips = e.surface === 'desktop'
-    const legendLines = !hoverTips && rowBar.length > 0 ? packLegend(contextLegend(breakdown), fill?.window ?? 0, inner) : []
-    // Each part of the bar is a keyed Box, so hovering it reveals a tooltip beneath it: the part's name, tokens and
-    // share. A tooltip that would run past the card's right edge hangs from the part's right edge instead.
-    const windowSize = fill?.window ?? 0
-    let offset = 0
-    const parts = bar.map((run, index) => {
-      const start = offset
-      offset += run.cells
-      const item = hoverTips && run.label !== undefined && run.tokens !== undefined
-        ? { label: run.label, glyph: run.glyph, color: run.color, tokens: run.tokens }
-        : undefined
-      const tip = item === undefined ? undefined : legendText(item, windowSize)
-      return { run, index, item, hangRight: tip !== undefined && start + tip.length > inner }
-    })
+    // The legend sits under the bar, which the terminal draws as text.
+    const legendLines = rowBar.length > 0 ? packLegend(contextLegend(breakdown), fill?.window ?? 0, inner) : []
     const tokensText = fill === null || fill.tokens === undefined ? undefined : `${compactTokens(fill.tokens)} of ${compactTokens(fill.window)}`
     const withModel = e.props.bodyColumns >= 90
     const withCost = e.props.bodyColumns >= 100
@@ -311,8 +317,6 @@ export const register: Register = on => {
         <Text bold>quota</Text>
       </Box>
     )
-    // The bars are set in the code font (`mono`), the face the layout counts their cells in: the UI font draws a
-    // block or line wider than a cell, so a part of the context bar would wrap its run onto lines above and below it.
     const quotaWindows = (
       <Box flexDirection="row">
         {rows.length === 0 ? (
@@ -328,8 +332,8 @@ export const register: Register = on => {
               <Box key={w.kind} flexDirection="row">
                 {i === 0 ? null : <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text>}
                 <Text color="inactive">{`${labelOf(w.kind)} `}</Text>
-                <Text color={tone} mono>{cells.filled}</Text>
-                <Text color="subtle" mono>{cells.empty}</Text>
+                <Text color={tone}>{cells.filled}</Text>
+                <Text color="subtle">{cells.empty}</Text>
                 <Text bold color="black" backgroundColor={pillColorOf(tone)}>{` ${percent}% `}</Text>
                 {resetShown[i] && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
               </Box>
@@ -387,38 +391,11 @@ export const register: Register = on => {
                 </Text>
               )}
             </Box>
-            {parts.length > 0 && parts.every(part => part.item !== undefined) ? (
-              <Box flexDirection="row">
-                {parts.map(({ run, index, item, hangRight }) => (
-                  <Box key={`part-${index}`} width={run.cells} overflow="visible">
-                    <Text color={run.color} mono>{run.glyph.repeat(run.cells)}</Text>
-                    {item === undefined ? null : (
-                      <Box
-                        position="absolute"
-                        top={1}
-                        left={hangRight ? undefined : 0}
-                        right={hangRight ? 0 : undefined}
-                        display="none"
-                        hover={{ display: 'flex' }}
-                      >
-                        <Text>
-                          <Text color={item.color}>{`${item.glyph} `}</Text>
-                          <Text dimColor>{`${item.label} `}</Text>
-                          <Text bold>{compactTokens(item.tokens)}</Text>
-                          <Text dimColor>{` ${shareOf(item.tokens, windowSize)}`}</Text>
-                        </Text>
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Text>
-                {bar.map((run, index) => (
-                  <Text key={`bar-${index}`} color={run.color} mono>{run.glyph.repeat(run.cells)}</Text>
-                ))}
-              </Text>
-            )}
+            <Text>
+              {bar.map((run, index) => (
+                <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+              ))}
+            </Text>
             {legendLines.map((items, row) => (
               <Text key={`legend-${row}`} wrap="truncate-end">
                 {items.map((item, index) => (
@@ -469,6 +446,33 @@ export const register: Register = on => {
       if (row === Math.floor(CHART_ROWS / 2)) return middleLabel
       if (row === CHART_ROWS - 1) return bottomLabel
       return ''
+    }
+
+    // On the desktop app the pane has its own drawing: solid bars and cells, with the figures in larger type.
+    if (e.surface === 'desktop') {
+      return desktopPane(
+        {
+          columns,
+          state,
+          selected,
+          ranges: RANGES,
+          onSelect: async key => {
+            await update($, range, () => key)
+          },
+          context: ctxNow,
+          breakdown: ctxRowsNow ?? [],
+          days,
+          entries,
+          grand,
+          sessions,
+          anyUsage,
+          hours,
+          hourMax,
+          bars,
+          max,
+        },
+        { Box, Button, Text },
+      )
     }
 
     return (
