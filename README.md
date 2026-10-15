@@ -10,7 +10,7 @@ A Claude Code mod that shows, right above the prompt, a card with your account's
 
 **Quota.** At the top of the card, under a `◆ quota` heading. In the terminal, one line gives each window a bar, a badge with its percentage, and `↻` with its reset time. In the desktop app, the windows sit side by side, each with a solid bar, its percentage in large type, and the reset time under the bar. The reset is just the time if it is later today, otherwise the weekday and time. The percentage is green under 70%, amber from 70%, red from 90%.
 
-**Context.** Below the quota row, in the same card, the context window. Its header has the tokens against the window, like `92k of 200k`, and the fill as a percentage: green under 70%, amber from 70%, red from 90%. Below it, the bar has a colour for each group in use (system, tools, memory and messages), a buffer that auto-compaction keeps back, and the free space. In the terminal the bar is drawn in characters: a dim `░` for the buffer and a thin `─` for the free space. In the desktop app it is solid colour, with the buffer and the free space as lighter tracks. On both, the legend sits under the bar with each group's tokens and share, so nothing waits on a hover. The fill shows `—` until the session's first response, and again after a compaction until the next response.
+**Context.** In the terminal, below the quota row in the same card: the context window, with its header of tokens against the window, like `92k of 200k`, and the fill as a percentage: green under 70%, amber from 70%, red from 90%. Below it, the bar has a colour for each group in use (system, tools, memory and messages), a dim `░` for the buffer that auto-compaction keeps back, and a thin `─` for the free space, with the legend under the bar. The fill shows `—` until the session's first response, and again after a compaction until the next response. The band in the desktop app leaves the context out, since the desktop app has its own context panel. The `/tokens` pane still shows the context in use.
 
 **Alerts.** When a limit or the context passes 90%, the mod raises one toast. A limit's toast says how long it has left at the pace it has been filling. The context's toast suggests `/compact`.
 
@@ -70,7 +70,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 - `docs/*.svg`: the illustrations above; the numbers in the tokens chart are example data
 - `docs/gen-visuals.mjs`: draws those illustrations, with `node docs/gen-visuals.mjs`
 - `hooks/register.tsx`: hooks, the speed row and the card above the prompt with the quota and the context, the toasts, and the `/tokens` pane
-- `hooks/band.tsx`: the band on the desktop app, with solid bars, the large percentages, and the legend under the context bar
+- `hooks/band.tsx`: the band on the desktop app, with the quota as solid bars and the large percentages
 - `hooks/pane.tsx`: the `/tokens` pane on the desktop app, with solid columns, a bar per model, and the heatmap
 - `hooks/alerts.ts`: the 90% toasts, and the time a limit has left at its pace
 - `hooks/context.ts`: the groups of the context bar, its runs and the legend's lines, and the tokens pane's legend

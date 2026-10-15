@@ -1,9 +1,8 @@
 import type { BoxProps, ElementConstructor, TextProps } from 'claude-code'
 
-import type { ContextFill, ContextRow, ModelInUse, QuotaWindow } from '../types'
+import type { ModelInUse, QuotaWindow } from '../types'
 
-import { contextBar, contextLegend, shareOf } from './context'
-import { clip, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
+import { clip, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
 import { WORKING } from './timing'
 import { modelName } from './tokens'
 
@@ -19,8 +18,6 @@ export type BandView = {
   columns: number
   now: Date
   windows: QuotaWindow[]
-  fill: ContextFill | null
-  breakdown: ContextRow[]
   model: ModelInUse | null
   cost: number | null
   /** The speed row's text, starting with the word `working` while a step runs. */
@@ -38,7 +35,7 @@ const CARD_MIN_INNER = 20
 const WINDOW_GAP = 4
 /** The narrowest a quota window may be before the windows stack one above the other. */
 const WINDOW_MIN = 30
-/** The part of a bar that is not used: the rest of a quota bar and the free space of the context. */
+/** The part of a quota bar that is not used. */
 const TRACK = 'subtle'
 
 /** One quota window: its label and percentage, its bar across the column, and its reset time under the bar. */
@@ -87,63 +84,6 @@ function quotaSection(view: BandView, inner: number, els: BandElements) {
   )
 }
 
-/**
- * The context: its heading with the tokens and the fill, one bar of the window's parts, and the legend under it.
- * The parts come from the breakdown once it has tokens; before that the bar shows the fill alone, or a bare track.
- */
-function contextSection(view: BandView, inner: number, els: BandElements) {
-  const { Box, Text } = els
-  const percent = view.fill?.percent === undefined ? null : Math.round(view.fill.percent)
-  const tone = percent === null ? null : toneOf(percent)
-  const tokens = view.fill?.tokens === undefined
-    ? undefined
-    : `${compactTokens(view.fill.tokens)} of ${compactTokens(view.fill.window)}`
-  const parts = percent === null ? [] : contextBar(view.breakdown, inner)
-  const filled = percent === null ? 0 : filledCells(percent, inner)
-  const runs: { color: string; cells: number }[] =
-    percent === null || tone === null
-      ? [{ color: TRACK, cells: inner }]
-      : parts.length > 0
-        ? parts
-        : [{ color: tone, cells: filled }, { color: TRACK, cells: inner - filled }]
-  const legend = parts.length > 0 ? contextLegend(view.breakdown) : []
-  return (
-    <Box flexDirection="column" gap={1}>
-      <Box flexDirection="row" justifyContent="space-between" alignItems="flex-end">
-        <Text size="footnote" weight="semibold">
-          <Text color="claude">{'◆ '}</Text>
-          {'context'}
-        </Text>
-        <Box flexDirection="row" alignItems="flex-end" columnGap={2}>
-          {tokens === undefined ? null : <Text size="caption" color="inactive" tabular>{tokens}</Text>}
-          {percent === null || tone === null ? (
-            <Text size="heading" color="inactive">{'—'}</Text>
-          ) : (
-            <Text size="heading" weight="semibold" tabular color={tone}>{`${percent}%`}</Text>
-          )}
-        </Box>
-      </Box>
-      <Box flexDirection="row" width={inner} height={1}>
-        {runs.filter(run => run.cells > 0).map((run, index) => (
-          <Box key={`run-${index}`} width={run.cells} height={1} backgroundColor={run.color} />
-        ))}
-      </Box>
-      {legend.length === 0 ? null : (
-        <Box flexDirection="row" flexWrap="wrap" columnGap={3}>
-          {legend.map(item => (
-            <Text key={item.label} size="caption">
-              <Text color={item.color}>{'■ '}</Text>
-              <Text color="inactive">{`${item.label} `}</Text>
-              <Text tabular>{compactTokens(item.tokens)}</Text>
-              <Text color="inactive">{` ${shareOf(item.tokens, view.fill?.window ?? 0)}`}</Text>
-            </Text>
-          ))}
-        </Box>
-      )}
-    </Box>
-  )
-}
-
 /** The speed row above the card: the model in use, the light while a step runs, the speeds, and the session's cost. */
 function speedRow(view: BandView, { Box, Text }: BandElements) {
   return (
@@ -177,27 +117,21 @@ function speedRow(view: BandView, { Box, Text }: BandElements) {
 }
 
 /**
- * The band on the desktop app: the speed row above a card with the quota and the context. The bars are solid
- * colour, the percentages large, and the context's legend sits under its bar, so nothing waits on a hover.
- * The terminal draws the same band as text, in register.tsx.
+ * The band on the desktop app: the speed row above a card with the quota, its windows as solid bars. The context is
+ * left out, since the desktop app has its own panel for it. The terminal draws the band as text, in register.tsx.
  */
 export function desktopBand(view: BandView, els: BandElements) {
   const { Box } = els
   const inner = view.columns - CHROME
-  const body = (
-    <Box flexDirection="column" gap={1}>
-      {quotaSection(view, inner, els)}
-      {contextSection(view, inner, els)}
-    </Box>
-  )
+  const quota = quotaSection(view, inner, els)
   return (
     <Box flexDirection="column" marginTop={1} rowGap={1}>
       {speedRow(view, els)}
       {inner >= CARD_MIN_INNER ? (
         <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} paddingY={1}>
-          {body}
+          {quota}
         </Box>
-      ) : body}
+      ) : quota}
     </Box>
   )
 }
