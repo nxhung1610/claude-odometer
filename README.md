@@ -8,7 +8,7 @@ A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a l
 
 ## What it shows
 
-**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time. The row ends with the context window's fill as `ctx`, with the same thresholds. It shows `—` until the session's first response, and again after a compaction until the next response. On a wide band it also shows the tokens against the window, like `92k/200k`.
+**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time. The row ends with the context window's fill as `ctx`, with the same thresholds. It shows `—` until the session's first response, and again after a compaction until the next response. On a wide band it also shows the tokens against the window, like `92k/200k`. The bar is split into colours by what fills the context: system, tools, memory and messages. The tokens pane lists each group and the free space.
 
 **Speed.** The row beneath the quota shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The row starts with that model and its effort, and on a wide band ends with the session's cost, as `/cost` totals it.
 ![While a step runs, a light moves across the word working, one letter at a time](docs/speed.svg)

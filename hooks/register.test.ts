@@ -38,7 +38,12 @@ const SCAN = {
 
 type RateWindow = { kind: string; percentUsed: number; resetsAt?: string }
 
-type ContextReading = { window: number; percent?: number; tokens?: number }
+type ContextReading = {
+  window: number
+  percent?: number
+  tokens?: number
+  breakdown?: { categories: { name: string; tokens: number; kind: 'used' | 'free' | 'buffer' | 'deferred' }[] }
+}
 
 /**
  * What the engine answers beneath the mod, which a test gives itself: a session
@@ -47,7 +52,7 @@ type ContextReading = { window: number; percent?: number; tokens?: number }
  */
 function engine(on: On, rateLimits: RateWindow[] = [], commands: CommandSpec[] = [], context: ContextReading = { window: 200_000 }, spend?: number) {
   on('session.start', () => ({ cwd: '/tmp' }))
-  on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context, rateLimits, cost: spend === undefined ? undefined : { usd: spend } } }))
+  on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context: context as never, rateLimits, cost: spend === undefined ? undefined : { usd: spend } } }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('command.register', (_, e) => {
     commands.push(e)
@@ -587,6 +592,62 @@ test('the model and the cost leave the speed row on a narrow band', async ($, on
   ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 100 } })
   expect(await ui.find({ type: 'Text', text: /Opus/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /\$1\.24/ })).toBeDefined()
+  await ui.unmount()
+})
+
+const CONTEXT_IN_USE: ContextReading = {
+  window: 200_000,
+  percent: 40,
+  tokens: 80_000,
+  breakdown: {
+    categories: [
+      { name: 'System prompt', tokens: 10_000, kind: 'used' },
+      { name: 'Messages', tokens: 70_000, kind: 'used' },
+      { name: 'Free space', tokens: 120_000, kind: 'free' },
+    ],
+  },
+}
+
+test('the context bar takes one colour per group in use', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], CONTEXT_IN_USE)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: '▓' })).toMatchObject({ props: { color: '#3987e5' } })
+  expect(await ui.find({ type: 'Text', text: '▓▓▓' })).toMatchObject({ props: { color: '#d56aa0' } })
+  await ui.unmount()
+})
+
+test('the tokens pane says how much context is in use, and what it holds', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], CONTEXT_IN_USE)
+  withPython(on, () => ran(0, JSON.stringify(SCAN)))
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: 'Context now: 80k of 200k' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Messages 70k/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a new session starts the speed row afresh, without the last model', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 5000, outputTokens: 100 }))
+
+  const step = $.turn.step(OPUS)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  await stopStep(step)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /Opus/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /TTFT —/ })).toBeDefined()
   await ui.unmount()
 })
 
