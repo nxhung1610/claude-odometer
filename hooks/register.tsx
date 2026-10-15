@@ -3,8 +3,8 @@ import { atom, read, update } from 'claude-code'
 
 import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, toneOf } from './format'
-import { LEGEND_SPLIT, contextBar, contextLegend, packLegend, shareOf } from './context'
+import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, resetsThatFit, toneOf } from './format'
+import { LEGEND_SPLIT, contextBar, contextLegend, legendText, packLegend, shareOf } from './context'
 import type { BarRun } from './context'
 import { contextAlert, limitAlert, minutesToFull, passed } from './alerts'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
@@ -266,69 +266,111 @@ export const register: Register = on => {
     const ctxPercent = fill?.percent === undefined ? null : Math.round(fill.percent)
     const ctxTone = ctxPercent === null ? null : toneOf(ctxPercent)
     const breakdown = ctxRows ?? []
-    const bar: BarRun[] = ctxPercent === null || ctxTone === null
+    // The fill alone, when there is no part of the window to draw: a dash before the first response, else filled cells.
+    const fillBar: BarRun[] = ctxPercent === null || ctxTone === null
       ? [{ color: 'subtle', glyph: '─', cells: inner }]
-      : breakdown.length > 0
-        ? contextBar(breakdown, inner)
-        : [
-            { color: ctxTone, glyph: '█', cells: Math.min(inner, filledCells(ctxPercent, inner)) },
-            { color: 'subtle', glyph: '─', cells: Math.max(0, inner - filledCells(ctxPercent, inner)) },
-          ]
-    const legend = ctxPercent !== null && fill !== null && breakdown.length > 0
-      ? packLegend(contextLegend(breakdown), fill.window, inner)
-      : []
+      : [
+          { color: ctxTone, glyph: '█', cells: Math.min(inner, filledCells(ctxPercent, inner)) },
+          { color: 'subtle', glyph: '─', cells: Math.max(0, inner - filledCells(ctxPercent, inner)) },
+        ]
+    // The parts of the window, once the breakdown has tokens to show: an all-zero breakdown would leave the bar empty.
+    const rowBar: BarRun[] = ctxPercent === null ? [] : contextBar(breakdown, inner)
+    const bar: BarRun[] = rowBar.length > 0 ? rowBar : fillBar
+    // Hovering a part shows its tooltip on a surface with hover (the desktop app); elsewhere the legend sits under the bar.
+    const hoverTips = e.surface === 'desktop'
+    const legendLines = !hoverTips && rowBar.length > 0 ? packLegend(contextLegend(breakdown), fill?.window ?? 0, inner) : []
+    // Each part of the bar is a keyed Box, so hovering it reveals a tooltip beneath it: the part's name, tokens and
+    // share. A tooltip that would run past the card's right edge hangs from the part's right edge instead.
+    const windowSize = fill?.window ?? 0
+    let offset = 0
+    const parts = bar.map((run, index) => {
+      const start = offset
+      offset += run.cells
+      const item = hoverTips && run.label !== undefined && run.tokens !== undefined
+        ? { label: run.label, glyph: run.glyph, color: run.color, tokens: run.tokens }
+        : undefined
+      const tip = item === undefined ? undefined : legendText(item, windowSize)
+      return { run, index, item, hangRight: tip !== undefined && start + tip.length > inner }
+    })
     const tokensText = fill === null || fill.tokens === undefined ? undefined : `${compactTokens(fill.tokens)} of ${compactTokens(fill.window)}`
     const withModel = e.props.bodyColumns >= 90
     const withCost = e.props.bodyColumns >= 100
 
+    // The quota is drawn as the context is below it: a diamond heading, then one line with each window's bar,
+    // badge and reset time.
+    // A window keeps its reset time while the quota line fits the card; the last resets go first.
+    const windowParts = rows.map(w => ({
+      label: labelOf(w.kind),
+      badge: ` ${Math.round(w.percentUsed)}% `,
+      reset: withReset ? resetLabel(w.resetsAt, now) : '',
+    }))
+    const resetShown = resetsThatFit(windowParts, inner, barWidth, roomy)
+    const quotaHeader = (
+      <Box flexDirection="row">
+        <Text color="claude">{'◆ '}</Text>
+        <Text bold>quota</Text>
+      </Box>
+    )
+    const quotaWindows = (
+      <Box flexDirection="row">
+        {rows.length === 0 ? (
+          <Text color="inactive">no data yet</Text>
+        ) : (
+          rows.map((w, i) => {
+            const percent = Math.round(w.percentUsed)
+            const tone = toneOf(percent)
+            const cells = barCells(percent, barWidth)
+            const reset = resetLabel(w.resetsAt, now)
+
+            return (
+              <Box key={w.kind} flexDirection="row">
+                {i === 0 ? null : <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text>}
+                <Text color="inactive">{`${labelOf(w.kind)} `}</Text>
+                <Text color={tone}>{cells.filled}</Text>
+                <Text color="subtle">{cells.empty}</Text>
+                <Text bold color="black" backgroundColor={pillColorOf(tone)}>{` ${percent}% `}</Text>
+                {resetShown[i] && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
+              </Box>
+            )
+          })
+        )}
+      </Box>
+    )
+    const quotaRow = (
+      <Box flexDirection="column">
+        {quotaHeader}
+        {quotaWindows}
+      </Box>
+    )
+
+    // The speed row sits above the card: the model in use, the light while a step runs, its speeds and the cost.
+    const speedRow = (
+      <Box flexDirection="row">
+        <Text color="inactive">{'  '}</Text>
+        {withModel && modelInUse !== null ? (
+          <Box flexDirection="row">
+            <Text color="claude">{clip(modelName(modelInUse.model), 18)}</Text>
+            <Text color="inactive">{modelInUse.effort === undefined ? ' · ' : ` (${modelInUse.effort}) · `}</Text>
+          </Box>
+        ) : null}
+        {running ? (
+          [...WORKING].map((letter, i) => (
+            <Text key={`letter-${i}`} color={i === lit ? 'claude' : 'inactive'} bold={i === lit}>
+              {letter}
+            </Text>
+          ))
+        ) : null}
+        <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
+        {withCost && spend !== null ? <Text color="inactive">{` · ${formatCost(spend)}`}</Text> : null}
+      </Box>
+    )
+
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Box flexDirection="row">
-          <Text color="claude" bold>
-            {roomy ? '  Quota  ' : '  Quota '}
-          </Text>
-          {rows.length === 0 ? (
-            <Text color="inactive">no data yet</Text>
-          ) : (
-            rows.map((w, i) => {
-              const percent = Math.round(w.percentUsed)
-              const tone = toneOf(percent)
-              const cells = barCells(percent, barWidth)
-              const reset = resetLabel(w.resetsAt, now)
-
-              return (
-                <Box key={w.kind} flexDirection="row">
-                  {i > 0 ? <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text> : null}
-                  <Text color="inactive">{labelOf(w.kind)} </Text>
-                  <Text color={tone}>{cells.filled}</Text>
-                  <Text color="subtle">{cells.empty}</Text>
-                  <Text color={tone}>{` ${percent}%`}</Text>
-                  {withReset && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
-                </Box>
-              )
-            })
-          )}
-        </Box>
-        <Box flexDirection="row">
-          <Text color="inactive">{'  '}</Text>
-          {withModel && modelInUse !== null ? (
-            <Box flexDirection="row">
-              <Text color="claude">{clip(modelName(modelInUse.model), 18)}</Text>
-              <Text color="inactive">{modelInUse.effort === undefined ? ' · ' : ` (${modelInUse.effort}) · `}</Text>
-            </Box>
-          ) : null}
-          {running ? (
-            [...WORKING].map((letter, i) => (
-              <Text key={`letter-${i}`} color={i === lit ? 'claude' : 'inactive'} bold={i === lit}>
-                {letter}
-              </Text>
-            ))
-          ) : null}
-          <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
-          {withCost && spend !== null ? <Text color="inactive">{` · ${formatCost(spend)}`}</Text> : null}
-        </Box>
+        {speedRow}
         {withCard ? (
           <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
+            {quotaRow}
             <Box flexDirection="row" justifyContent="space-between">
               <Text wrap="truncate-end">
                 <Text color="claude">{'◆ '}</Text>
@@ -343,12 +385,39 @@ export const register: Register = on => {
                 </Text>
               )}
             </Box>
-            <Text>
-              {bar.map((run, index) => (
-                <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
-              ))}
-            </Text>
-            {legend.map((items, row) => (
+            {parts.length > 0 && parts.every(part => part.item !== undefined) ? (
+              <Box flexDirection="row">
+                {parts.map(({ run, index, item, hangRight }) => (
+                  <Box key={`part-${index}`} width={run.cells} overflow="visible">
+                    <Text color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+                    {item === undefined ? null : (
+                      <Box
+                        position="absolute"
+                        top={1}
+                        left={hangRight ? undefined : 0}
+                        right={hangRight ? 0 : undefined}
+                        display="none"
+                        hover={{ display: 'flex' }}
+                      >
+                        <Text>
+                          <Text color={item.color}>{`${item.glyph} `}</Text>
+                          <Text dimColor>{`${item.label} `}</Text>
+                          <Text bold>{compactTokens(item.tokens)}</Text>
+                          <Text dimColor>{` ${shareOf(item.tokens, windowSize)}`}</Text>
+                        </Text>
+                      </Box>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Text>
+                {bar.map((run, index) => (
+                  <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+                ))}
+              </Text>
+            )}
+            {legendLines.map((items, row) => (
               <Text key={`legend-${row}`} wrap="truncate-end">
                 {items.map((item, index) => (
                   <Text key={item.label}>
@@ -362,7 +431,9 @@ export const register: Register = on => {
               </Text>
             ))}
           </Box>
-        ) : null}
+        ) : (
+          quotaRow
+        )}
       </Box>
     )
   })

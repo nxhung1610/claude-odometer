@@ -16,8 +16,9 @@ export type ContextGroup = (typeof CONTEXT_GROUPS)[number]['key']
 /** The buffer auto-compaction keeps back and the free space: the parts of the window that no group holds. */
 const BUFFER = { label: 'Buffer', glyph: '░', color: 'inactive' }
 const FREE = { label: 'Free', glyph: '─', color: 'subtle' }
-/** The glyph of a group in use, and the gap between two items of the legend. */
+/** The glyph of a group in use. */
 const USED_GLYPH = '█'
+/** The gap between two items of a legend line. */
 export const LEGEND_SPLIT = '   '
 
 /** The group of a used row, by its name as /context prints it. */
@@ -68,8 +69,11 @@ export function allocateCells(cells: number, weights: number[]): number[] {
   return parts
 }
 
-/** One run of the bar: `cells` copies of `glyph`, in `color`. */
-export type BarRun = { color: string; glyph: string; cells: number }
+/**
+ * One part of the bar: `cells` copies of `glyph`, in `color`. A part that stands for a group, the buffer or the
+ * free space also names itself and its tokens, which its tooltip shows.
+ */
+export type BarRun = { color: string; glyph: string; cells: number; label?: string; tokens?: number }
 
 /**
  * The window as one bar of `width` cells, from left to right: each group in use in its colour, then the buffer,
@@ -78,7 +82,7 @@ export type BarRun = { color: string; glyph: string; cells: number }
 export function contextBar(rows: ContextRow[], width: number): BarRun[] {
   const totals = usedByGroup(rows)
   const parts = [
-    ...CONTEXT_GROUPS.map(group => ({ color: group.color, glyph: USED_GLYPH, tokens: totals.get(group.key) ?? 0, used: true })),
+    ...CONTEXT_GROUPS.map(group => ({ label: group.label, color: group.color, glyph: USED_GLYPH, tokens: totals.get(group.key) ?? 0, used: true })),
     { ...BUFFER, tokens: sumKind(rows, 'buffer'), used: false },
     { ...FREE, tokens: sumKind(rows, 'free'), used: false },
   ].filter(part => part.tokens > 0)
@@ -92,7 +96,7 @@ export function contextBar(rows: ContextRow[], width: number): BarRun[] {
     }
   })
   return parts
-    .map((part, index) => ({ color: part.color, glyph: part.glyph, cells: cells[index] ?? 0 }))
+    .map((part, index) => ({ label: part.label, color: part.color, glyph: part.glyph, tokens: part.tokens, cells: cells[index] ?? 0 }))
     .filter(run => run.cells > 0)
 }
 
@@ -123,8 +127,8 @@ export function shareOf(tokens: number, window: number): string {
   return `${Math.round(percent)}%`
 }
 
-/** One legend item as the band writes it, e.g. `■ System 10k 5%`. */
-function legendText(item: LegendItem, window: number): string {
+/** One part as its tooltip writes it, e.g. `■ System 10k 5%`. */
+export function legendText(item: LegendItem, window: number): string {
   return `${item.glyph} ${item.label} ${compactTokens(item.tokens)} ${shareOf(item.tokens, window)}`
 }
 

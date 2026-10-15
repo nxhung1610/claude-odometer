@@ -20,7 +20,7 @@ test('the quota row sits in the band above the prompt, with no data yet before a
     props: BAND,
   })
 
-  expect(await ui.find({ type: 'Text', text: /Quota/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /quota/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /no data yet/ })).toBeDefined()
   await ui.unmount()
 })

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { allocateCells, contextBar, contextLegend, groupOf, packLegend, shareOf } from './context'
+import { allocateCells, contextBar, contextLegend, groupOf, legendText, packLegend, shareOf } from './context'
 
 test('a context row is grouped by what it holds', () => {
   expect(groupOf('System prompt')).toBe('system')
@@ -29,10 +29,10 @@ test('the bar draws each group in use, then the buffer, then the free space, acr
     { name: 'Free space', tokens: 100_000, kind: 'free' as const },
   ]
   expect(contextBar(rows, 20)).toEqual([
-    { color: '#3987e5', glyph: '█', cells: 1 },
-    { color: '#d56aa0', glyph: '█', cells: 7 },
-    { color: 'inactive', glyph: '░', cells: 2 },
-    { color: 'subtle', glyph: '─', cells: 10 },
+    { label: 'System', color: '#3987e5', glyph: '█', cells: 1, tokens: 10_000 },
+    { label: 'Messages', color: '#d56aa0', glyph: '█', cells: 7, tokens: 70_000 },
+    { label: 'Buffer', color: 'inactive', glyph: '░', cells: 2, tokens: 20_000 },
+    { label: 'Free', color: 'subtle', glyph: '─', cells: 10, tokens: 100_000 },
   ])
 })
 
@@ -42,7 +42,7 @@ test('a group in use gets a cell even when rounding would leave it none', () => 
     { name: 'Messages', tokens: 199_000, kind: 'used' as const },
   ]
   const bar = contextBar(rows, 20)
-  expect(bar[0]).toEqual({ color: '#3987e5', glyph: '█', cells: 1 })
+  expect(bar[0]).toEqual({ label: 'System', color: '#3987e5', glyph: '█', cells: 1, tokens: 1_000 })
   expect(bar.reduce((sum, run) => sum + run.cells, 0)).toBe(20)
 })
 
@@ -89,4 +89,8 @@ test('the legend packs into lines no wider than the width', () => {
   ]
   expect(packLegend(items, 200_000, 40).map(line => line.map(item => item.label))).toEqual([['System', 'Messages'], ['Free']])
   expect(packLegend(items, 200_000, 15).map(line => line.map(item => item.label))).toEqual([['System'], ['Messages'], ['Free']])
+})
+
+test('a part of the bar reads as its glyph, name, tokens and share', () => {
+  expect(legendText({ label: 'System', glyph: '■', color: 'a', tokens: 10_000 }, 200_000)).toBe('■ System 10k 5%')
 })
