@@ -1,5 +1,6 @@
-import type { CommandSpec, On } from 'claude-code'
+import type { CommandSpec, On, TurnStepInput } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import type { MockClock } from 'claude-code/testing'
 
 const NOW = new Date(2026, 9, 14, 12, 0)
 const TODAY = '2026-10-14'
@@ -282,4 +283,175 @@ test('a wide band draws the quota with a 10-cell bar', async ($, on) => {
   // 23% of 10 cells is two filled cells, so eight stay empty.
   expect(await ui.find({ type: 'Text', text: '░░░░░░░░' })).toBeDefined()
   await ui.unmount()
+})
+
+const MAIN: TurnStepInput = { turnId: 'turn-1', index: 0, model: 'claude-haiku-5-5', messageCount: 1 }
+const SUB: TurnStepInput = { ...MAIN, agentId: 'sub-1' }
+
+/** One model step's timing in ms: its first text comes `firstAfter` after the step is asked for, its stop `stopAfter` after the next ask. */
+type StepTiming = { firstAfter: number; stopAfter: number; outputTokens: number }
+
+/**
+ * The model beneath the mod for `turn.step`. Each step waits as `timing` says for its agent (none on the main
+ * conversation), writes one text chunk, then stops with the output tokens it was given.
+ */
+function model(on: On, clock: MockClock, timing: (agentId: string | undefined) => StepTiming) {
+  on('turn.step', async function* (_, e) {
+    const { firstAfter, stopAfter, outputTokens } = timing(e.agentId)
+    await clock.sleep(firstAfter)
+    yield { kind: 'text', index: 0, text: 'hi' }
+    await clock.sleep(stopAfter)
+    yield {
+      kind: 'stop',
+      stopReason: 'end_turn',
+      usage: {
+        model: MAIN.model,
+        input_tokens: 10,
+        output_tokens: outputTokens,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
+    }
+  })
+}
+
+/** Stops a step's stream before it ends, as a consumer that stops reading does, so the mod's cleanup runs. */
+function stopStep(step: AsyncGenerator<unknown, unknown>) {
+  return step.return(undefined)
+}
+
+test('a step the consumer cuts short clears the running step, and keeps its time to first output', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 5000, outputTokens: 100 }))
+
+  const step = $.turn.step(MAIN)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  await stopStep(step)
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /TTFT 500ms/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /working/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a finished step shows its time to first output and its output speed', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 2000, outputTokens: 100 }))
+
+  const step = $.turn.step(MAIN)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  const last = step.next()
+  await clock.settle()
+  await clock.advance(2000)
+  await last
+  await stopStep(step)
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /TTFT 500ms · TPS 50 tok\/s/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /working/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a step that fails mid-stream still clears the running step', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  on('turn.step', async function* () {
+    await clock.sleep(500)
+    yield { kind: 'text', index: 0, text: 'hi' }
+    await clock.sleep(1000)
+    throw new Error('the stream broke')
+  })
+
+  const step = $.turn.step(MAIN)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  const failing = step.next().then(() => 'finished', () => 'failed')
+  await clock.settle()
+  await clock.advance(1000)
+  expect(await failing).toBe('failed')
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /working/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /TTFT 500ms/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('while a step runs, the row counts its seconds beside its time to first output', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 10_000, outputTokens: 100 }))
+
+  const step = $.turn.step(MAIN)
+  const first = step.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+  await clock.advance(1500) // 2.0 s into the step
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: / 2s · TTFT 500ms · last TPS —/ })).toBeDefined()
+  await ui.unmount()
+  await stopStep(step)
+})
+
+test("a sub-agent's step that overlaps the main step leaves the main step's reading alone", async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  model(on, clock, agentId =>
+    agentId === undefined
+      ? { firstAfter: 1000, stopAfter: 1500, outputTokens: 100 }
+      : { firstAfter: 700, stopAfter: 300, outputTokens: 40 },
+  )
+
+  const main = $.turn.step(MAIN)
+  const mainFirst = main.next()
+  await clock.settle()
+  await clock.advance(500) // 0.5 s: a sub-agent's step starts while the main step runs
+  const sub = $.turn.step(SUB)
+  const subFirst = sub.next()
+  await clock.settle()
+  await clock.advance(700) // 1.2 s: the main step's text came at 1.0 s, the sub-agent's at 1.2 s
+  await mainFirst
+  await subFirst
+  const subStop = sub.next()
+  await clock.settle()
+  await clock.advance(300) // 1.5 s: the sub-agent stops, and the main step is still running
+  await subStop
+
+  let ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: / 1s · TTFT 1.0s · last TPS —/ })).toBeDefined()
+  await ui.unmount()
+
+  const mainStop = main.next()
+  await clock.settle()
+  await clock.advance(1500) // 3.0 s: the main step stops, 2.0 s after its first text
+  await mainStop
+
+  ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /TTFT 1.0s · TPS 50 tok\/s/ })).toBeDefined()
+  await ui.unmount()
+  await stopStep(sub)
+  await stopStep(main)
+})
+
+test("a sub-agent's step alone leaves the speed row at its dashes", async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  model(on, clock, () => ({ firstAfter: 500, stopAfter: 1000, outputTokens: 40 }))
+
+  const sub = $.turn.step(SUB)
+  const first = sub.next()
+  await clock.settle()
+  await clock.advance(500)
+  await first
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /TTFT —/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /working/ })).toBeUndefined()
+  await ui.unmount()
+  await stopStep(sub)
 })
