@@ -233,6 +233,20 @@ class SummarizeTest(unittest.TestCase):
         summary = scan_usage.summarize(paths, root=self.root.name, today=TODAY)
         self.assertEqual(summary["sessions"], {"week": 2, "month": 4, "all": 5})
 
+    def test_hours_count_each_response_once_at_its_local_hour(self):
+        stamp = "2026-10-13T12:00:00Z"
+        hour = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone().hour
+        path = self.write(
+            "project/session-1.jsonl",
+            reply("msg_1", "claude-opus-5-5", USAGE, timestamp=stamp),
+            reply("msg_1", "claude-opus-5-5", USAGE, timestamp=stamp),
+        )
+
+        hours = scan_usage.summarize([path], root=self.root.name)["hours"]
+        # USAGE adds up to 135 tokens: 10 input, 5 output, 100 cache read and 20 cache write.
+        self.assertEqual(hours[DAY][hour], 135)
+        self.assertEqual(sum(hours[DAY]), 135)
+
 
 if __name__ == "__main__":
     unittest.main()

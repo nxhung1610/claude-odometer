@@ -23,6 +23,8 @@ export type TokenScan = {
   root: string
   sessions: Record<TokenRange, number>
   days: Record<string, Record<string, ModelTokens>>
+  /** The tokens of each local day (YYYY-MM-DD) by local hour: 24 counts, from midnight. */
+  hours: Record<string, number[]>
 }
 
 /** The `/tokens` pane's scan: waiting, running, then the result or why it failed. */

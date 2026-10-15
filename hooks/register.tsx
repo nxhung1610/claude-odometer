@@ -17,10 +17,13 @@ import {
   daysInRange,
   formatShare,
   formatTokens,
+  heatCell,
+  hourGrid,
   modelName,
   rankEntries,
   sumModels,
   tokensOf,
+  WEEKDAYS,
 } from './tokens'
 
 const windows = atom(
@@ -355,6 +358,8 @@ export const register: Register = on => {
     const grand = entries.reduce((sum, [, t]) => sum + tokensOf(t), 0)
     const sessions = scan ? scan.sessions[selected] : 0
     const anyUsage = scan ? Object.keys(scan.days).length > 0 : false
+    const hours = scan ? hourGrid(scan, days) : []
+    const hourMax = Math.max(0, ...hours.flat())
     const maxColumns = Math.max(4, Math.min(60, Math.floor((columns - 12) / 2)))
     const bars = scan ? columnsWithSegments(scan, days, order, maxColumns) : []
     const max = Math.max(1, ...bars.map(bar => bar.total))
@@ -436,6 +441,26 @@ export const register: Register = on => {
             <Text color="inactive">
               {`${formatTokens(grand)} tokens across ${sessions} ${sessions === 1 ? 'session' : 'sessions'}. Each API response is counted once; /stats adds every log row.`}
             </Text>
+            <Box flexDirection="column" marginTop={1}>
+              <Text bold>{'When tokens are used, by hour (local time)'}</Text>
+              <Text color="inactive">
+                {`    ${Array.from({ length: 24 }, (_, hour) => (hour % 3 === 0 ? String(hour).padEnd(2) : '  ')).join('')}`}
+              </Text>
+              {WEEKDAYS.map((name, row) => (
+                <Box key={name} flexDirection="row">
+                  <Text color="inactive">{`${name} `}</Text>
+                  {(hours[row] ?? []).map((value, hour) => {
+                    const cell = heatCell(value, hourMax)
+                    return (
+                      <Text key={`hour-${hour}`} color={cell.color}>
+                        {`${cell.char} `}
+                      </Text>
+                    )
+                  })}
+                </Box>
+              ))}
+              <Text color="inactive">{'    less ░▒▓█ more'}</Text>
+            </Box>
           </Box>
         ) : null}
       </Box>

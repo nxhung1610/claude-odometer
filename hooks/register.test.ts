@@ -651,6 +651,19 @@ test('a new session starts the speed row afresh, without the last model', async 
   await ui.unmount()
 })
 
+test('the tokens pane shows when tokens are used, by weekday and hour', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  const hours = Array.from({ length: 24 }, (_, hour) => (hour === 9 ? 1_000 : 0))
+  withPython(on, () => ran(0, JSON.stringify({ ...SCAN, hours: { [TODAY]: hours } })))
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: /Wed / })).toBeDefined() // TODAY, 2026-10-14, is a Wednesday
+  expect(await ui.find({ type: 'Text', text: /less/ })).toBeDefined()
+  await ui.unmount()
+})
+
 /** Collects the lines the mod raises with $.ui.toast. */
 function collectToasts(on: On): string[] {
   const lines: string[] = []

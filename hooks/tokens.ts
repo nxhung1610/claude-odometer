@@ -201,3 +201,29 @@ export function chartRows(columns: Column[], max: number, rows = CHART_ROWS): Ce
 export function axisLabels(max: number): [string, string, string] {
   return [formatTokens(max), formatTokens(max / 2), '0']
 }
+
+/** The days of the week, Monday first: the rows of the usage heatmap. */
+export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** Tokens per weekday (Monday first) and local hour, summed over the days given. */
+export function hourGrid(scan: TokenScan, days: string[]): number[][] {
+  const grid = WEEKDAYS.map(() => Array.from({ length: 24 }, () => 0))
+  for (const day of days) {
+    const counts = scan.hours?.[day]
+    const row = grid[(dayOf(day).getDay() + 6) % 7]
+    if (!counts || !row) continue
+    counts.forEach((tokens, hour) => {
+      row[hour] = (row[hour] ?? 0) + tokens
+    })
+  }
+  return grid
+}
+
+const SHADES = ['·', '░', '▒', '▓', '█']
+
+/** One heatmap cell: a shade by its share of the largest cell, and a dot when it holds nothing. */
+export function heatCell(value: number, max: number): { char: string; color: string } {
+  if (value <= 0 || max <= 0) return { char: SHADES[0] ?? '·', color: 'subtle' }
+  const level = Math.min(4, Math.ceil((value / max) * 4))
+  return { char: SHADES[level] ?? '█', color: 'claude' }
+}
