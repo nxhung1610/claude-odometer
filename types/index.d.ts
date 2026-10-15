@@ -70,6 +70,13 @@ export type ModelInUse = {
   effort?: string
 }
 
+/** One row of the context breakdown: its name as /context prints it, its estimated tokens, and what it is. */
+export type ContextRow = {
+  name: string
+  tokens: number
+  kind: 'used' | 'free' | 'buffer' | 'deferred'
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'odometer': {
@@ -85,6 +92,8 @@ declare module 'claude-code' {
       model: ModelInUse | null
       /** The session's cost in US dollars, shown at the end of the speed row. */
       cost: number | null
+      /** The rows of the live context breakdown, which colour the bar and fill the tokens pane's legend. */
+      contextRows: ContextRow[] | null
     }
   }
 }

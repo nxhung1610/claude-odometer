@@ -1,9 +1,10 @@
 import type { Register } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { ContextFill, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
+import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, clip, compactTokens, formatCost, labelOf, resetLabel, toneOf } from './format'
+import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
+import { contextLegend, contextSegments } from './context'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
   CHART_ROWS,
@@ -39,6 +40,11 @@ const model = atom(
 const cost = atom(
   { plugin: 'odometer', key: 'cost' } as const,
   null as number | null,
+)
+
+const contextRows = atom(
+  { plugin: 'odometer', key: 'contextRows' } as const,
+  null as ContextRow[] | null,
 )
 
 const tokens = atom(
@@ -87,12 +93,21 @@ async function pythonFor(
   return undefined
 }
 
+/** The rows of a context breakdown, as the state keeps them. */
+function rowsOf(breakdown: { categories: ContextRow[] } | undefined): ContextRow[] | null {
+  return breakdown ? breakdown.categories.map(({ name, tokens, kind }) => ({ name, tokens, kind })) : null
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    const reading = await $.session.usage()
+    const reading = await $.session.usage({ breakdown: 'summary' })
     await update($, windows, () => reading.rateLimits)
     await update($, context, () => reading.context)
+    await update($, contextRows, () => rowsOf(reading.context.breakdown))
     await update($, cost, () => reading.cost?.usd ?? null)
+    // A new session starts with no model in use and no speed to show, not the last session's.
+    await update($, model, () => null)
+    await update($, timing, () => null)
     // Runs at once when typed mid-turn: it reads the transcripts on disk, not the turn's state.
     await $.command.register({
       name: 'tokens',
@@ -109,6 +124,11 @@ export const register: Register = on => {
     await update($, windows, () => e.rateLimits)
     await update($, context, () => e.context)
     await update($, cost, () => e.cost?.usd ?? null)
+    // The measure never carries the breakdown, so a change of the fill asks for it.
+    if (e.changed.includes('context')) {
+      const reading = await $.session.usage({ breakdown: 'summary' })
+      await update($, contextRows, () => rowsOf(reading.context.breakdown))
+    }
 
     return next(e)
   })
@@ -187,7 +207,7 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return next(e)
 
     // One round trip for every state read the band needs, since the band redraws ten times a second while a step runs.
-    const [rows, speed, nowMs, frames, fill, modelInUse, spend] = await Promise.all([
+    const [rows, speed, nowMs, frames, fill, modelInUse, spend, ctxRows] = await Promise.all([
       read($, windows),
       read($, timing),
       $.clock.now(),
@@ -195,6 +215,7 @@ export const register: Register = on => {
       read($, context),
       read($, model),
       read($, cost),
+      read($, contextRows),
     ])
     const now = new Date(nowMs)
     const { Box, Text } = $.ui.resolve(e)
@@ -206,7 +227,12 @@ export const register: Register = on => {
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
     // The context fill is absent until the session's first response, shown as a dash.
     const ctxPercent = fill?.percent === undefined ? null : Math.round(fill.percent)
-    const fillBar = ctxPercent === null ? null : { percent: ctxPercent, cells: barCells(ctxPercent, barWidth), tone: toneOf(ctxPercent) }
+    const fillBar = ctxPercent === null ? null : {
+      percent: ctxPercent,
+      cells: barCells(ctxPercent, barWidth),
+      tone: toneOf(ctxPercent),
+      segments: contextSegments(ctxRows ?? [], filledCells(ctxPercent, barWidth)),
+    }
     // The tokens need 120 columns: the quota row with them is 107 wide, so a narrower band would wrap it.
     const detail = e.props.bodyColumns >= 120 && fill?.tokens !== undefined ? `${compactTokens(fill.tokens)}/${compactTokens(fill.window)}` : undefined
     const withContext = e.props.bodyColumns >= 70
@@ -247,7 +273,13 @@ export const register: Register = on => {
                 <Text color="inactive">{'—'}</Text>
               ) : (
                 <Box flexDirection="row">
-                  <Text color={fillBar.tone}>{fillBar.cells.filled}</Text>
+                  {fillBar.segments.length > 0 ? (
+                    fillBar.segments.map((segment, index) => (
+                      <Text key={`fill-${index}`} color={segment.color}>{'▓'.repeat(segment.cells)}</Text>
+                    ))
+                  ) : (
+                    <Text color={fillBar.tone}>{fillBar.cells.filled}</Text>
+                  )}
                   <Text color="subtle">{fillBar.cells.empty}</Text>
                   <Text color={fillBar.tone}>{` ${fillBar.percent}%`}</Text>
                   {detail === undefined ? null : <Text color="inactive">{`  ${detail}`}</Text>}
@@ -282,6 +314,8 @@ export const register: Register = on => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const state = await read($, tokens)
     const selected = await read($, range)
+    const ctxNow = await read($, context)
+    const ctxRowsNow = await read($, contextRows)
     const now = new Date(await $.clock.now())
     const columns = e.viewport?.columns ?? 80
 
@@ -307,6 +341,16 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
+        {ctxNow === null || ctxNow.tokens === undefined ? null : (
+          <Box flexDirection="column" marginBottom={1}>
+            <Text bold>{`Context now: ${compactTokens(ctxNow.tokens)} of ${compactTokens(ctxNow.window)}`}</Text>
+            <Box flexDirection="row">
+              {contextLegend(ctxRowsNow ?? []).map(item => (
+                <Text key={item.label} color={item.color}>{`■ ${item.label} ${compactTokens(item.tokens)}   `}</Text>
+              ))}
+            </Box>
+          </Box>
+        )}
         <Box flexDirection="row">
           {RANGES.map(item => (
             <Button
