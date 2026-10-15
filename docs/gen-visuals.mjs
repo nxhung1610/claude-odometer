@@ -106,9 +106,13 @@ function speed() {
     line(strip, 66),
     line(
       [
-        ['  wo', C.muted],
+        ['  ', C.muted],
+        ['Opus 5.5', C.accent],
+        [' (high) · ', C.muted],
+        ['wo', C.muted],
         ['r', C.accent, true],
         ['king 3s · TTFT 850ms · last TPS 42 tok/s', C.muted],
+        [' · $1.24', C.muted],
       ],
       126,
     ),

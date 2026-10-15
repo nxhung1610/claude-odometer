@@ -1,12 +1,13 @@
 """Counts the tokens each model used per local day, from the session transcripts.
 
 Prints one JSON object:
-  {"root": "<projects folder read>", "sessionsByDay": {"YYYY-MM-DD": [session id, ...]},
+  {"root": "<projects folder read>", "sessions": {"week": n, "month": n, "all": n},
    "days": {"YYYY-MM-DD": {model: {input, output, cacheRead, cacheWrite}}}}
 
-A session id is the name of a session transcript without its .jsonl. It is listed on each
-day that session had usage, its own or its sub-agents'. A sub-agent transcript adds its
-tokens to the session that spawned it, but it is not a session of its own.
+A session counts in a range when it had usage, its own or its sub-agents', on a day in that
+range: the last 7 days and the last 30 days, both counting today, and all days up to today.
+A sub-agent transcript adds its tokens to the session that spawned it, but it is not a session
+of its own. Session ids are read to count sessions and are never printed.
 
 A response is written to a transcript once per content block, with the same
 message id and the same usage each time, so each message id is counted once.
@@ -70,8 +71,24 @@ def owning_session(path, root=ROOT):
     return None
 
 
-def summarize(paths, root=ROOT):
-    """The sessions per day and the per-day tokens of the given transcripts, read in the order given."""
+def sessions_in_ranges(session_days, today):
+    """How many sessions had usage in the last 7 days, the last 30 days, and all time up to today.
+
+    Day keys are ISO dates, so comparing them as text compares the days themselves."""
+    end = today.isoformat()
+    starts = {
+        "week": (today - datetime.timedelta(days=6)).isoformat(),
+        "month": (today - datetime.timedelta(days=29)).isoformat(),
+        "all": "",
+    }
+    return {
+        name: len({owner for day, owners in session_days.items() if start <= day <= end for owner in owners})
+        for name, start in starts.items()
+    }
+
+
+def summarize(paths, root=ROOT, today=None):
+    """The sessions in each range and the per-day tokens of the given transcripts, read in the order given."""
     seen = set()
     session_days = {}
     days = {}
@@ -113,7 +130,7 @@ def summarize(paths, root=ROOT):
                     tally[key] += count(usage.get(field))
     return {
         "root": root,
-        "sessionsByDay": {day: sorted(ids) for day, ids in session_days.items()},
+        "sessions": sessions_in_ranges(session_days, today or datetime.date.today()),
         "days": days,
     }
 

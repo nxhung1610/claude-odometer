@@ -13,6 +13,12 @@ import scan_usage
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scan_usage.py")
 DAY = datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
 USAGE = {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 20}
+TODAY = datetime.date(2026, 10, 15)
+
+
+def stamp_days_ago(days):
+    """A timestamp at noon UTC, that many days before TODAY: the same local day in any zone from UTC-11 to UTC+11."""
+    return f"{(TODAY - datetime.timedelta(days=days)).isoformat()}T12:00:00Z"
 
 
 def reply(message_id, model, usage, session="session-1", timestamp="2026-10-13T12:00:00Z"):
@@ -99,7 +105,7 @@ class ScanUsageTest(unittest.TestCase):
             {DAY: {"claude-opus-5-5": {"input": 4, "output": 0, "cacheRead": 0, "cacheWrite": 0}}},
         )
 
-    def test_sessions_by_day_lists_the_session_transcripts_that_had_usage(self):
+    def test_sessions_count_the_session_transcripts_that_had_usage(self):
         self.write("project/session-a.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, session="session-a"))
         self.write(
             "project/session-a/subagents/agent-x.jsonl",
@@ -117,11 +123,11 @@ class ScanUsageTest(unittest.TestCase):
         )
 
         scan = self.scan()
-        self.assertEqual(scan["sessionsByDay"], {DAY: ["session-a", "session-b"]})
+        self.assertEqual(scan["sessions"]["all"], 2)
         # Sub-agent tokens still count toward the days: four responses, one input token each.
         self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 4)
 
-    def test_a_session_with_usage_on_two_days_is_listed_on_both(self):
+    def test_a_session_with_usage_on_two_days_counts_once(self):
         first = datetime.datetime.fromisoformat("2026-10-12T12:00:00+00:00").astimezone().date().isoformat()
         second = datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
         self.write(
@@ -130,11 +136,10 @@ class ScanUsageTest(unittest.TestCase):
             reply("msg_2", "claude-opus-5-5", {"input_tokens": 1}, timestamp="2026-10-13T12:00:00Z"),
         )
 
-        self.assertEqual(self.scan()["sessionsByDay"], {first: ["session-1"], second: ["session-1"]})
+        self.assertEqual(self.scan()["sessions"]["all"], 1)
 
     def test_a_sub_agent_adds_its_session_on_the_day_of_its_usage(self):
-        first = datetime.datetime.fromisoformat("2026-10-12T12:00:00+00:00").astimezone().date().isoformat()
-        second = datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
+        second =datetime.datetime.fromisoformat("2026-10-13T12:00:00+00:00").astimezone().date().isoformat()
         self.write(
             "project/session-1.jsonl",
             reply("msg_1", "claude-opus-5-5", {"input_tokens": 5}, timestamp="2026-10-12T12:00:00Z"),
@@ -145,7 +150,7 @@ class ScanUsageTest(unittest.TestCase):
         )
 
         scan = self.scan()
-        self.assertEqual(scan["sessionsByDay"], {first: ["session-1"], second: ["session-1"]})
+        self.assertEqual(scan["sessions"]["all"], 1)
         self.assertEqual(scan["days"][second]["claude-opus-5-5"]["input"], 7)
 
     def test_a_sub_agent_counts_toward_its_session_when_the_session_file_is_missing(self):
@@ -154,7 +159,7 @@ class ScanUsageTest(unittest.TestCase):
             reply("msg_3", "claude-opus-5-5", {"input_tokens": 3}, session="agent-z"),
         )
 
-        self.assertEqual(self.scan()["sessionsByDay"], {DAY: ["session-9"]})
+        self.assertEqual(self.scan()["sessions"]["all"], 1)
 
 
 class SummarizeTest(unittest.TestCase):
@@ -208,8 +213,25 @@ class SummarizeTest(unittest.TestCase):
         for order in ([sub_agent, main], [main, sub_agent]):
             with self.subTest(order=order):
                 summary = scan_usage.summarize(order, root=self.root.name)
-                self.assertEqual(summary["sessionsByDay"], {DAY: ["session-1"]})
+                self.assertEqual(summary["sessions"]["all"], 1)
                 self.assertEqual(summary["days"][DAY]["claude-opus-5-5"]["input"], 1)
+
+    def test_each_range_counts_a_session_once_and_starts_at_its_first_day(self):
+        # Ranges count today and the 6 or 29 days before it, so 7 and 30 days back start one day later.
+        paths = [
+            self.write(
+                "project/session-now.jsonl",
+                reply("msg_1", "claude-opus-5-5", {"input_tokens": 1}, session="session-now", timestamp=stamp_days_ago(0)),
+                reply("msg_2", "claude-opus-5-5", {"input_tokens": 1}, session="session-now", timestamp=stamp_days_ago(10)),
+            ),
+            self.write("project/session-6.jsonl", reply("msg_3", "claude-opus-5-5", {"input_tokens": 1}, session="session-6", timestamp=stamp_days_ago(6))),
+            self.write("project/session-7.jsonl", reply("msg_4", "claude-opus-5-5", {"input_tokens": 1}, session="session-7", timestamp=stamp_days_ago(7))),
+            self.write("project/session-29.jsonl", reply("msg_5", "claude-opus-5-5", {"input_tokens": 1}, session="session-29", timestamp=stamp_days_ago(29))),
+            self.write("project/session-30.jsonl", reply("msg_6", "claude-opus-5-5", {"input_tokens": 1}, session="session-30", timestamp=stamp_days_ago(30))),
+        ]
+
+        summary = scan_usage.summarize(paths, root=self.root.name, today=TODAY)
+        self.assertEqual(summary["sessions"], {"week": 2, "month": 4, "all": 5})
 
 
 if __name__ == "__main__":

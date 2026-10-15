@@ -32,7 +32,7 @@ const TOKENS = {
 }
 const SCAN = {
   root: '/home/me/.claude/projects',
-  sessionsByDay: { [TODAY]: ['session-a', 'session-b'] },
+  sessions: { week: 2, month: 2, all: 2 },
   days: { [TODAY]: { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 } } },
 }
 
@@ -183,7 +183,7 @@ test('the chart axis runs from the first day of the range to the last', async ($
   mock.clock(on, { now: NOW.getTime() })
   engine(on)
   const old = { 'claude-opus-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } }
-  withPython(on, () => ran(0, JSON.stringify({ sessionsByDay: { '2026-03-01': ['session-old'] }, days: { '2026-03-01': old } })))
+  withPython(on, () => ran(0, JSON.stringify({ sessions: { week: 0, month: 0, all: 1 }, days: { '2026-03-01': old } })))
   await $.command.run(TOKENS)
 
   // Narrow enough that the 228 days of "all time" are grouped into columns.
@@ -208,7 +208,7 @@ test('the footer counts the sessions in the range shown, and all time counts eve
   mock.clock(on, { now: NOW.getTime() })
   engine(on)
   withPython(on, () => ran(0, JSON.stringify({
-    sessionsByDay: { [TODAY]: ['session-a', 'session-b'], '2026-03-01': ['session-old'] },
+    sessions: { week: 2, month: 2, all: 3 },
     days: {
       [TODAY]: { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 } },
       '2026-03-01': { 'claude-opus-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } },
@@ -228,7 +228,7 @@ test('the footer says session in the singular for one session', async ($, on) =>
   engine(on)
   withPython(on, () => ran(0, JSON.stringify({
     root: '/home/me/.claude/projects',
-    sessionsByDay: { [TODAY]: ['session-a'] },
+    sessions: { week: 1, month: 1, all: 1 },
     days: { [TODAY]: { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 } } },
   })))
   await $.command.run(TOKENS)
@@ -243,7 +243,7 @@ test('a range with no tokens says so when other days have usage', async ($, on) 
   engine(on)
   withPython(on, () => ran(0, JSON.stringify({
     root: '/home/me/.claude/projects',
-    sessionsByDay: { '2026-03-01': ['session-old'] },
+    sessions: { week: 0, month: 0, all: 1 },
     days: { '2026-03-01': { 'claude-opus-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } } },
   })))
   await $.command.run(TOKENS)
@@ -256,7 +256,7 @@ test('a range with no tokens says so when other days have usage', async ($, on) 
 test('a folder with no transcripts that have usage says where it looked', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on)
-  withPython(on, () => ran(0, JSON.stringify({ root: '/custom/projects', sessionsByDay: {}, days: {} })))
+  withPython(on, () => ran(0, JSON.stringify({ root: '/custom/projects', sessions: { week: 0, month: 0, all: 0 }, days: {} })))
   await $.command.run(TOKENS)
 
   const ui = await $.ui.mount(TOKENS_PANE)

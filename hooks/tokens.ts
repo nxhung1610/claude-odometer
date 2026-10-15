@@ -138,11 +138,6 @@ export function sumModels(scan: TokenScan, days: string[]): Record<string, Model
   return sums
 }
 
-/** The sessions with usage on some of the days, each counted once however many of those days it spans. */
-export function sessionsIn(scan: TokenScan, days: string[]): number {
-  return new Set(days.flatMap(day => scan.sessionsByDay[day] ?? [])).size
-}
-
 /** The models with their totals, most used first. A model with no tokens in the range is left out. */
 export function rankEntries(totals: Record<string, ModelTokens>): Array<[string, ModelTokens]> {
   return Object.entries(totals)

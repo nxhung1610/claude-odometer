@@ -60,6 +60,11 @@ export function formatCost(usd: number): string {
   return `$${usd.toFixed(2)}`
 }
 
+/** Cuts text to `max` characters, ending with an ellipsis when it is cut. */
+export function clip(text: string, max: number): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
