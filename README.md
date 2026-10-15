@@ -2,9 +2,9 @@
 
 [![test](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml/badge.svg)](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml)
 
-A Claude Code mod that shows, right above the prompt, a card with your account's 5-hour and 7-day usage limits and the context window's fill, and on the line above it the model answering, how fast it answers, and the session's cost.
+A Claude Code mod that shows, right above the prompt, a card with your account's 5-hour and 7-day usage limits and, in the terminal, the context window's fill; and on the line above it the model answering, how fast it answers, and the session's cost.
 
-![The quota at three levels: 23% in green, 75% in amber, 91% in red](docs/quota.svg)
+![The card in the terminal: the quota at three levels, with its percentages in green, amber and red, and the context below with its parts](docs/quota.svg)
 
 ## What it shows
 
@@ -20,7 +20,7 @@ A Claude Code mod that shows, right above the prompt, a card with your account's
 
 **`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data. At the top, `Context now` names the context in use, by group. Below the chart, a heatmap shows when tokens were used, by weekday and hour, in local time. In the desktop app the chart and the heatmap are solid colour, the total is in large type, and each model has a bar of its share. In the terminal they are drawn in characters.
 
-![The /tokens pane: a stacked column chart of tokens per day, with a legend for Opus, Sonnet and Haiku](docs/tokens.svg)
+![The /tokens pane in the terminal: the context in use, a stacked column chart of tokens per day, and the heatmap of hours](docs/tokens.svg)
 
 ## Install
 
@@ -59,7 +59,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 - `session.start` reads the current rate-limit windows, the context fill with its breakdown, and the session's cost. It also clears the model and speed of any earlier session.
 - `session.measure` updates them when the engine reports a change in a window, in the context fill or in the cost. A change of the fill asks for the breakdown again, since a measure does not carry one. A limit or the context that passes 90% raises a toast.
-- `ui.render` on `AbovePrompt` draws the model's speed on a row above the prompt, and below it a card with the quota and the context window. On the desktop app `hooks/band.tsx` draws the band; the terminal draws it in `hooks/register.tsx`. The band yields while a survey holds it.
+- `ui.render` on `AbovePrompt` draws the model's speed on a row above the prompt, and below it a card with the quota and, in the terminal, the context window. On the desktop app `hooks/band.tsx` draws the band with the quota alone; the terminal draws the band in `hooks/register.tsx`. The band yields while a survey holds it.
 - `turn.step` times each model step of the main conversation; a sub-agent's steps pass on untimed, since sub-agents can run alongside it and the row has one timing slot. It records the model and effort each one asked for. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
 - `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time, with the context in use and the heatmap. On the desktop app `hooks/pane.tsx` draws the pane; the terminal draws it in `hooks/register.tsx`. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `$CLAUDE_CONFIG_DIR/projects`, or in `~/.claude/projects` when that variable is unset or empty. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp. It prints the tokens per day by model and per local hour, and for each range how many sessions had usage in it, with a sub-agent's usage counted under the session that spawned it. It sends nothing anywhere.
 
@@ -67,15 +67,15 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 - `.claude-plugin/`: `plugin.json`, and `marketplace.json`, which the install line above reads
 - `bin/install.js`, `package.json`: an installer that runs the install line above through the Claude Code CLI, and its npm metadata
-- `docs/*.svg`: the illustrations above; the numbers in the tokens chart are example data
+- `docs/*.svg`: the illustrations above; the numbers in the tokens pane are example data
 - `docs/gen-visuals.mjs`: draws those illustrations, with `node docs/gen-visuals.mjs`
-- `hooks/register.tsx`: hooks, the speed row and the card above the prompt with the quota and the context, the toasts, and the `/tokens` pane
+- `hooks/register.tsx`: hooks, the speed row and the card above the prompt in the terminal, with the quota and the context, the toasts, and the terminal's `/tokens` pane
 - `hooks/band.tsx`: the band on the desktop app, with the quota as solid bars and the large percentages
 - `hooks/pane.tsx`: the `/tokens` pane on the desktop app, with solid columns, a bar per model, and the heatmap
 - `hooks/alerts.ts`: the 90% toasts, and the time a limit has left at its pace
 - `hooks/context.ts`: the groups of the context bar, its runs and the legend's lines, and the tokens pane's legend
 - `hooks/timing.ts`: the speed row's text, the TTFT and TPS arithmetic, the step state, and the light's position
-- `hooks/format.ts`: bar, tone, reset-label, token-count, cost and text-clipping helpers
+- `hooks/format.ts`: bar, tone, reset-label and time-left, token-count, cost and text-clipping helpers
 - `hooks/tokens.ts`: the `/tokens` chart, heatmap and summary helpers
 - `hooks/scan_usage.py`: counts tokens per day, model and local hour, and sessions per range, from the transcripts
 - `hooks/*.test.ts`, `hooks/test_scan_usage.py`: tests

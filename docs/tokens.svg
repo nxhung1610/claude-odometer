@@ -1,45 +1,58 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="620" height="402" viewBox="0 0 620 402">
-  <rect width="620" height="402" rx="12" fill="#1a1a19"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="704" viewBox="0 0 620 704">
+  <rect width="620" height="704" rx="12" fill="#1a1a19"/>
   <g font-family="ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15">
-  <rect x="149.51999999999998" y="48" width="125.51999999999998" height="26" rx="6" fill="#2c2c2a"/>
 <text x="36" y="34" xml:space="preserve" style="white-space:pre"><tspan fill="#f0efec" font-weight="700">Tokens per day</tspan></text>
-<text x="36" y="66" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">  All time   </tspan><tspan fill="#f0efec" font-weight="700"> Last 7 days </tspan><tspan fill="#c3c2b7">   Last 30 days</tspan></text>
-<text x="99.28" y="108" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">1.4M</text>
-<rect x="234.88" y="92" width="9.04" height="22" fill="#199e70"/>
-<rect x="234.88" y="114" width="9.04" height="22" fill="#3987e5"/>
-<rect x="216.79999999999998" y="147" width="9.04" height="11" fill="#199e70"/>
-<rect x="234.88" y="136" width="9.04" height="22" fill="#3987e5"/>
-<rect x="144.48" y="169" width="9.04" height="11" fill="#199e70"/>
-<rect x="216.79999999999998" y="158" width="9.04" height="22" fill="#3987e5"/>
-<rect x="234.88" y="158" width="9.04" height="22" fill="#d95926"/>
-<text x="99.28" y="196" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">695.0k</text>
-<rect x="144.48" y="180" width="9.04" height="22" fill="#3987e5"/>
-<rect x="162.56" y="188.25" width="9.04" height="13.75" fill="#199e70"/>
-<rect x="216.79999999999998" y="180" width="9.04" height="22" fill="#3987e5"/>
-<rect x="234.88" y="180" width="9.04" height="22" fill="#d95926"/>
-<rect x="126.39999999999999" y="202" width="9.04" height="22" fill="#199e70"/>
-<rect x="144.48" y="202" width="9.04" height="22" fill="#d95926"/>
-<rect x="162.56" y="202" width="9.04" height="22" fill="#3987e5"/>
-<rect x="216.79999999999998" y="202" width="9.04" height="22" fill="#d95926"/>
-<rect x="234.88" y="202" width="9.04" height="22" fill="#d95926"/>
-<rect x="126.39999999999999" y="224" width="9.04" height="22" fill="#d95926"/>
-<rect x="144.48" y="224" width="9.04" height="22" fill="#d95926"/>
-<rect x="162.56" y="224" width="9.04" height="22" fill="#d95926"/>
-<rect x="216.79999999999998" y="224" width="9.04" height="22" fill="#d95926"/>
-<rect x="234.88" y="224" width="9.04" height="22" fill="#d95926"/>
-<text x="99.28" y="262" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">0</text>
-<rect x="126.39999999999999" y="246" width="9.04" height="22" fill="#d95926"/>
-<rect x="144.48" y="246" width="9.04" height="22" fill="#d95926"/>
-<rect x="162.56" y="246" width="9.04" height="22" fill="#d95926"/>
-<rect x="180.64" y="248.75" width="9.04" height="19.25" fill="#3987e5"/>
-<rect x="198.71999999999997" y="265.25" width="9.04" height="2.75" fill="#d95926"/>
-<rect x="216.79999999999998" y="246" width="9.04" height="22" fill="#d95926"/>
-<rect x="234.88" y="246" width="9.04" height="22" fill="#d95926"/>
-<rect x="112.33999999999999" y="92" width="1" height="176" fill="#898781"/>
-<rect x="112.33999999999999" y="268" width="140.62" height="1" fill="#898781"/>
-<text x="126.39999999999999" y="290" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Oct 8 … Oct 14</tspan></text>
-<text x="36" y="326" xml:space="preserve" style="white-space:pre"><tspan fill="#d95926">■ </tspan><tspan fill="#c3c2b7">Opus 5.5   </tspan><tspan fill="#3987e5">■ </tspan><tspan fill="#c3c2b7">Sonnet 5.5   </tspan><tspan fill="#199e70">■ </tspan><tspan fill="#c3c2b7">Haiku 5.5</tspan></text>
-<text x="36" y="358" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">4.5M tokens across 12 sessions.</tspan></text>
-<text x="36" y="380" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">Each API response is counted once; /stats adds every log row.</tspan></text>
+<text x="36" y="62" xml:space="preserve" style="white-space:pre"><tspan fill="#f0efec" font-weight="700">Context now: 62k of 200k</tspan></text>
+<text x="36" y="84" xml:space="preserve" style="white-space:pre"><tspan fill="#3987e5">■ </tspan><tspan fill="#c3c2b7">System 5k</tspan><tspan fill="#898781">   </tspan><tspan fill="#8e6fd8">■ </tspan><tspan fill="#c3c2b7">Tools 15k</tspan><tspan fill="#898781">   </tspan><tspan fill="#2aa198">■ </tspan><tspan fill="#c3c2b7">Memory 4k</tspan><tspan fill="#898781">   </tspan><tspan fill="#d56aa0">■ </tspan><tspan fill="#c3c2b7">Messages 38k</tspan></text>
+<text x="36" y="106" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">░ </tspan><tspan fill="#c3c2b7">Buffer 33k</tspan><tspan fill="#898781">   </tspan><tspan fill="#383835">─ </tspan><tspan fill="#c3c2b7">Free 105k</tspan></text>
+  <rect x="149.51999999999998" y="112" width="125.51999999999998" height="26" rx="6" fill="#2c2c2a"/>
+<text x="36" y="130" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">  All time   </tspan><tspan fill="#f0efec" font-weight="700"> Last 7 days </tspan><tspan fill="#c3c2b7">   Last 30 days</tspan></text>
+<text x="99.28" y="178" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">1.4M</text>
+<rect x="234.88" y="162" width="9.04" height="22" fill="#199e70"/>
+<rect x="234.88" y="184" width="9.04" height="22" fill="#3987e5"/>
+<rect x="216.79999999999998" y="217" width="9.04" height="11" fill="#199e70"/>
+<rect x="234.88" y="206" width="9.04" height="22" fill="#3987e5"/>
+<rect x="144.48" y="239" width="9.04" height="11" fill="#199e70"/>
+<rect x="216.79999999999998" y="228" width="9.04" height="22" fill="#3987e5"/>
+<rect x="234.88" y="228" width="9.04" height="22" fill="#d95926"/>
+<text x="99.28" y="266" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">695.0k</text>
+<rect x="144.48" y="250" width="9.04" height="22" fill="#3987e5"/>
+<rect x="162.56" y="258.25" width="9.04" height="13.75" fill="#199e70"/>
+<rect x="216.79999999999998" y="250" width="9.04" height="22" fill="#3987e5"/>
+<rect x="234.88" y="250" width="9.04" height="22" fill="#d95926"/>
+<rect x="126.39999999999999" y="272" width="9.04" height="22" fill="#199e70"/>
+<rect x="144.48" y="272" width="9.04" height="22" fill="#d95926"/>
+<rect x="162.56" y="272" width="9.04" height="22" fill="#3987e5"/>
+<rect x="216.79999999999998" y="272" width="9.04" height="22" fill="#d95926"/>
+<rect x="234.88" y="272" width="9.04" height="22" fill="#d95926"/>
+<rect x="126.39999999999999" y="294" width="9.04" height="22" fill="#d95926"/>
+<rect x="144.48" y="294" width="9.04" height="22" fill="#d95926"/>
+<rect x="162.56" y="294" width="9.04" height="22" fill="#d95926"/>
+<rect x="216.79999999999998" y="294" width="9.04" height="22" fill="#d95926"/>
+<rect x="234.88" y="294" width="9.04" height="22" fill="#d95926"/>
+<text x="99.28" y="332" text-anchor="end" fill="#898781" xml:space="preserve" style="white-space:pre">0</text>
+<rect x="126.39999999999999" y="316" width="9.04" height="22" fill="#d95926"/>
+<rect x="144.48" y="316" width="9.04" height="22" fill="#d95926"/>
+<rect x="162.56" y="316" width="9.04" height="22" fill="#d95926"/>
+<rect x="180.64" y="318.75" width="9.04" height="19.25" fill="#3987e5"/>
+<rect x="198.71999999999997" y="335.25" width="9.04" height="2.75" fill="#d95926"/>
+<rect x="216.79999999999998" y="316" width="9.04" height="22" fill="#d95926"/>
+<rect x="234.88" y="316" width="9.04" height="22" fill="#d95926"/>
+<rect x="112.33999999999999" y="162" width="1" height="176" fill="#898781"/>
+<rect x="112.33999999999999" y="338" width="140.62" height="1" fill="#898781"/>
+<text x="126.39999999999999" y="360" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Oct 8 … Oct 14</tspan></text>
+<text x="36" y="396" xml:space="preserve" style="white-space:pre"><tspan fill="#d95926">■ </tspan><tspan fill="#c3c2b7">Opus 5.5   </tspan><tspan fill="#3987e5">■ </tspan><tspan fill="#c3c2b7">Sonnet 5.5   </tspan><tspan fill="#199e70">■ </tspan><tspan fill="#c3c2b7">Haiku 5.5</tspan></text>
+<text x="36" y="428" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">4.5M tokens across 12 sessions.</tspan></text>
+<text x="36" y="450" xml:space="preserve" style="white-space:pre"><tspan fill="#c3c2b7">Each API response is counted once; /stats adds every log row.</tspan></text>
+<text x="36" y="484" xml:space="preserve" style="white-space:pre"><tspan fill="#f0efec" font-weight="700">When tokens are used, by hour (local time)</tspan></text>
+<text x="36" y="506" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">    0     3     6     9     12    15    18    21    </tspan></text>
+<text x="36" y="528" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Mon </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="550" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Tue </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="572" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Wed </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="594" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Thu </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="616" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Fri </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">█ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▓ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="638" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Sat </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">▒ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="660" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">Sun </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#d95926">░ </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan><tspan fill="#383835">· </tspan></text>
+<text x="36" y="682" xml:space="preserve" style="white-space:pre"><tspan fill="#898781">    less ░▒▓█ more</tspan></text>
   </g>
 </svg>
