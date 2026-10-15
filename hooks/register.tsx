@@ -5,6 +5,7 @@ import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, Quot
 
 import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
 import { contextLegend, contextSegments } from './context'
+import { contextAlert, limitAlert, minutesToFull, passed } from './alerts'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
   CHART_ROWS,
@@ -45,6 +46,11 @@ const cost = atom(
 const contextRows = atom(
   { plugin: 'odometer', key: 'contextRows' } as const,
   null as ContextRow[] | null,
+)
+
+const windowsAt = atom(
+  { plugin: 'odometer', key: 'windowsAt' } as const,
+  null as number | null,
 )
 
 const tokens = atom(
@@ -100,8 +106,10 @@ function rowsOf(breakdown: { categories: ContextRow[] } | undefined): ContextRow
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    const startedAt = await $.clock.now()
     const reading = await $.session.usage({ breakdown: 'summary' })
     await update($, windows, () => reading.rateLimits)
+    await update($, windowsAt, () => startedAt)
     await update($, context, () => reading.context)
     await update($, contextRows, () => rowsOf(reading.context.breakdown))
     await update($, cost, () => reading.cost?.usd ?? null)
@@ -121,13 +129,33 @@ export const register: Register = on => {
   // Pushed by the engine when a window moves a whole point or the context fill moves, so the
   // line refreshes without polling.
   on('session.measure', async ($, e, next) => {
+    const before = await read($, windows)
+    const beforeAt = await read($, windowsAt)
+    const fillBefore = await read($, context)
+    const at = await $.clock.now()
     await update($, windows, () => e.rateLimits)
+    await update($, windowsAt, () => at)
     await update($, context, () => e.context)
     await update($, cost, () => e.cost?.usd ?? null)
     // The measure never carries the breakdown, so a change of the fill asks for it.
     if (e.changed.includes('context')) {
       const reading = await $.session.usage({ breakdown: 'summary' })
       await update($, contextRows, () => rowsOf(reading.context.breakdown))
+    }
+    // A limit or the context that has just passed the alert line raises one toast. A limit's toast says how long
+    // it has left at the pace it has been filling.
+    for (const window of e.rateLimits) {
+      const previous = before.find(w => w.kind === window.kind)
+      if (previous && passed(previous.percentUsed, window.percentUsed)) {
+        const minutes =
+          beforeAt === null
+            ? undefined
+            : minutesToFull({ percent: previous.percentUsed, at: beforeAt }, { percent: window.percentUsed, at })
+        $.ui.toast(limitAlert(window, minutes, new Date(at)), { timeoutMs: 8000 })
+      }
+    }
+    if (e.context.percent !== undefined && passed(fillBefore?.percent, e.context.percent)) {
+      $.ui.toast(contextAlert(e.context.percent), { timeoutMs: 8000 })
     }
 
     return next(e)
