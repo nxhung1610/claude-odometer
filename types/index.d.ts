@@ -94,6 +94,8 @@ declare module 'claude-code' {
       cost: number | null
       /** The rows of the live context breakdown, which colour the bar and fill the tokens pane's legend. */
       contextRows: ContextRow[] | null
+      /** When the rate-limit windows were last read, in milliseconds: the pace of a limit is taken from it. */
+      windowsAt: number | null
     }
   }
 }

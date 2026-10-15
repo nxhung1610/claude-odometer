@@ -651,6 +651,55 @@ test('a new session starts the speed row afresh, without the last model', async 
   await ui.unmount()
 })
 
+/** Collects the lines the mod raises with $.ui.toast. */
+function collectToasts(on: On): string[] {
+  const lines: string[] = []
+  on('ui.toast', (_, e) => {
+    lines.push(e.text)
+    return { value: undefined }
+  })
+  return lines
+}
+
+test('a limit passing 90% raises a toast with the time left at its pace', async ($, on) => {
+  const clock = mock.clock(on, { now: NOW.getTime() })
+  const lines = collectToasts(on)
+  engine(on, [{ kind: 'five_hour', percentUsed: 85 }])
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+  await clock.advance(60_000)
+
+  await $.session.measure({
+    context: { window: 200_000 },
+    rateLimits: [{ kind: 'five_hour', percentUsed: 91 }],
+    changed: ['rateLimits'],
+  })
+  expect(lines).toEqual(['5h at 91%, about 2 min to 100% at this pace'])
+})
+
+test('a limit that stays above 90% raises no toast', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  const lines = collectToasts(on)
+  engine(on, [{ kind: 'five_hour', percentUsed: 91 }])
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  await $.session.measure({
+    context: { window: 200_000 },
+    rateLimits: [{ kind: 'five_hour', percentUsed: 92 }],
+    changed: ['rateLimits'],
+  })
+  expect(lines).toEqual([])
+})
+
+test('the context passing 90% raises a toast suggesting /compact', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  const lines = collectToasts(on)
+  engine(on, [], [], { window: 200_000, percent: 85 })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  await $.session.measure({ context: { window: 200_000, percent: 91 }, rateLimits: [], changed: ['context'] })
+  expect(lines).toEqual(['Context at 91%: consider /compact soon'])
+})
+
 test('a cost change moves the figure on the speed row', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000 }, 1.236)
