@@ -292,38 +292,38 @@ test('a wide band draws the quota with a 10-cell bar', async ($, on) => {
   await ui.unmount()
 })
 
-test('session start shows the context fill on the quota row, with a dash before the first response', async ($, on) => {
+test('session start shows the context card, with a dash before the first response', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on)
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
   const ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: /ctx / })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /^—$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'context' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '—' })).toBeDefined()
   await ui.unmount()
 })
 
-test('the context fill is green below 70%, amber from 70% and red from 90%', async ($, on) => {
+test('the context badge is green below 70%, yellow from 70% and red from 90%', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000, percent: 69 })
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
   let ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 69%' })).toMatchObject({ props: { color: 'success' } })
+  expect(await ui.find({ type: 'Text', text: ' 69% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'green' } }] })
   await ui.unmount()
 
   await $.session.measure({ context: { window: 200_000, percent: 70 }, rateLimits: [], changed: ['context'] })
   ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 70%' })).toMatchObject({ props: { color: 'warning' } })
+  expect(await ui.find({ type: 'Text', text: ' 70% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'yellow' } }] })
   await ui.unmount()
 
   await $.session.measure({ context: { window: 200_000, percent: 90 }, rateLimits: [], changed: ['context'] })
   ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 90%' })).toMatchObject({ props: { color: 'error' } })
+  expect(await ui.find({ type: 'Text', text: ' 90% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'red' } }] })
   await ui.unmount()
 })
 
-test('a context change moves the quota row to the new fill', async ($, on) => {
+test('a context change moves the card to the new fill', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000, percent: 30 })
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
@@ -335,36 +335,34 @@ test('a context change moves the quota row to the new fill', async ($, on) => {
   })
 
   const ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: ' 92%' })).toMatchObject({ props: { color: 'error' } })
-  expect(await ui.find({ type: 'Text', text: ' 30%' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: ' 92% ' })).toMatchObject({ children: [{ props: { backgroundColor: 'red' } }] })
+  expect(await ui.find({ type: 'Text', text: ' 30% ' })).toBeUndefined()
   await ui.unmount()
 })
 
-test('the context fill shows from 70 columns, and stays off below', async ($, on) => {
+test('the context card shows from 24 columns, and stays off below', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000, percent: 30 })
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
-  let ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 69 } })
-  expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeUndefined()
+  let ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 23 } })
+  expect(await ui.find({ type: 'Text', text: 'context' })).toBeUndefined()
   await ui.unmount()
 
-  ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 70 } })
-  expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeDefined()
+  ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 24 } })
+  expect(await ui.find({ type: 'Text', text: 'context' })).toBeDefined()
   await ui.unmount()
 })
 
-test('on a wide band the context fill shows its tokens against the window', async ($, on) => {
+test('the card shows the tokens against the window, on a narrow band too', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], { window: 200_000, percent: 46, tokens: 92_000 })
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
-  let ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 120 } })
-  expect(await ui.find({ type: 'Text', text: /92k\/200k/ })).toBeDefined()
-  await ui.unmount()
-
-  ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 119 } })
-  expect(await ui.find({ type: 'Text', text: /92k/ })).toBeUndefined()
+  const ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 60 } })
+  expect(await ui.find({ type: 'Text', text: /92k of 200k/ })).toMatchObject({
+    children: [{ props: { dimColor: true } }, { props: { backgroundColor: 'green' }, children: [' 46% '] }],
+  })
   await ui.unmount()
 })
 
@@ -376,8 +374,8 @@ test('after a compaction the context fill is a dash again, until the next respon
   await $.session.measure({ context: { window: 200_000 }, rateLimits: [], changed: ['context'] })
 
   const ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: /^—$/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: ' 45%' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: '—' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' 45% ' })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -608,14 +606,21 @@ const CONTEXT_IN_USE: ContextReading = {
   },
 }
 
-test('the context bar takes one colour per group in use', async ($, on) => {
+test('the context bar takes one colour per group in use, and the free space a thin line', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], CONTEXT_IN_USE)
   await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
 
+  // At 140 columns the bar is 136 cells: 7 for the system prompt, 48 for messages, and 81 of free space.
   const ui = await $.ui.mount(QUOTA)
-  expect(await ui.find({ type: 'Text', text: '▓' })).toMatchObject({ props: { color: '#3987e5' } })
-  expect(await ui.find({ type: 'Text', text: '▓▓▓' })).toMatchObject({ props: { color: '#d56aa0' } })
+  expect(await ui.find({ type: 'Text', text: /^█+─+$/ })).toMatchObject({
+    children: [
+      { props: { color: '#3987e5' }, children: ['█'.repeat(7)] },
+      { props: { color: '#d56aa0' }, children: ['█'.repeat(48)] },
+      { props: { color: 'subtle' }, children: ['─'.repeat(81)] },
+    ],
+  })
+  expect(await ui.find({ type: 'Text', text: '10k' })).toBeDefined() // the legend gives each group's tokens
   await ui.unmount()
 })
 

@@ -2,18 +2,23 @@
 
 [![test](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml/badge.svg)](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml)
 
-A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a line right above the prompt, each with a bar and its reset time, and below it how fast the model is answering.
+A Claude Code mod that shows, on lines right above the prompt, your account's 5-hour and 7-day usage limits with their reset times, the model answering and how fast it answers, the session's cost, and the context window's fill in a card.
 
 ![The quota row at three levels: 23% in green, 75% in amber, 91% in red](docs/quota.svg)
 
 ## What it shows
 
-**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time. The row ends with the context window's fill as `ctx`, with the same thresholds. It shows `—` until the session's first response, and again after a compaction until the next response. On a wide band it also shows the tokens against the window, like `92k/200k`. The bar is split into colours by what fills the context: system, tools, memory and messages. The tokens pane lists each group and the free space. When a limit or the context passes 90%, the mod raises one toast: a limit's toast says how long it has left at the pace it has been filling, and the context's suggests `/compact`.
+**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time.
+
+**Context.** Under the quota and speed rows, a card at the foot of the band, nearest the prompt, shows the context window. Its header has the tokens against the window, like `92k of 200k`, and the fill as a percentage on a badge: green under 70%, amber from 70%, red from 90%. Below it, the bar has a colour for each group in use (system, tools, memory and messages), a dim `░` for the buffer that auto-compaction keeps back, and a thin `─` for the free space. A legend under the bar gives each part's tokens and share. The fill shows `—` until the session's first response, and again after a compaction until the next response.
+
+**Alerts.** When a limit or the context passes 90%, the mod raises one toast. A limit's toast says how long it has left at the pace it has been filling. The context's toast suggests `/compact`.
 
 **Speed.** The row beneath the quota shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The row starts with that model and its effort, and on a wide band ends with the session's cost, as `/cost` totals it.
+
 ![While a step runs, a light moves across the word working, one letter at a time](docs/speed.svg)
 
-**`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data. Below the chart, a heatmap shows when tokens were used, by weekday and hour, in local time.
+**`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data. At the top, `Context now` names the context in use, by group. Below the chart, a heatmap shows when tokens were used, by weekday and hour, in local time.
 
 ![The /tokens pane: a stacked column chart of tokens per day, with a legend for Opus, Sonnet and Haiku](docs/tokens.svg)
 
@@ -52,11 +57,11 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 ## How it works
 
-- `session.start` reads the current rate-limit windows, the context fill and the session's cost.
-- `session.measure` updates them when the engine reports a change in a window, in the context fill or in the cost.
-- `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, with the context fill at its end, and the model's speed on the row beneath. The band yields while a survey holds it.
+- `session.start` reads the current rate-limit windows, the context fill with its breakdown, and the session's cost. It also clears the model and speed of any earlier session.
+- `session.measure` updates them when the engine reports a change in a window, in the context fill or in the cost. A change of the fill asks for the breakdown again, since a measure does not carry one. A limit or the context that passes 90% raises a toast.
+- `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, the model's speed on the row beneath, and the context card at the foot of the band. The band yields while a survey holds it.
 - `turn.step` times each model step of the main conversation; a sub-agent's steps pass on untimed, since sub-agents can run alongside it and the row has one timing slot. It records the model and effort each one asked for. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
-- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `$CLAUDE_CONFIG_DIR/projects`, or in `~/.claude/projects` when that variable is unset or empty. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus, for each range, how many sessions had usage in it, with a sub-agent's usage counted under the session that spawned it; it sends nothing anywhere.
+- `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time, with the context in use and the heatmap. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `$CLAUDE_CONFIG_DIR/projects`, or in `~/.claude/projects` when that variable is unset or empty. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp. It prints the tokens per day by model and per local hour, and for each range how many sessions had usage in it, with a sub-agent's usage counted under the session that spawned it. It sends nothing anywhere.
 
 ## Files
 
@@ -64,12 +69,14 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 - `bin/install.js`, `package.json`: an installer that runs the install line above through the Claude Code CLI, and its npm metadata
 - `docs/*.svg`: the illustrations above; the numbers in the tokens chart are example data
 - `docs/gen-visuals.mjs`: draws those illustrations, with `node docs/gen-visuals.mjs`
-- `hooks/register.tsx`: hooks, the quota and speed rows above the prompt, and the `/tokens` pane
+- `hooks/register.tsx`: hooks, the quota, context and speed rows above the prompt, the toasts, and the `/tokens` pane
+- `hooks/alerts.ts`: the 90% toasts, and the time a limit has left at its pace
+- `hooks/context.ts`: the groups of the context bar, its runs and the legend's lines, and the tokens pane's legend
 - `hooks/timing.ts`: the speed row's text, the TTFT and TPS arithmetic, the step state, and the light's position
-- `hooks/format.ts`: bar, tone, and reset-label helpers
-- `hooks/tokens.ts`: the `/tokens` chart and summary helpers
-- `hooks/scan_usage.py`: counts tokens per day and model from the transcripts
+- `hooks/format.ts`: bar, tone, reset-label, token-count, cost and text-clipping helpers
+- `hooks/tokens.ts`: the `/tokens` chart, heatmap and summary helpers
+- `hooks/scan_usage.py`: counts tokens per day, model and local hour, and sessions per range, from the transcripts
 - `hooks/*.test.ts`, `hooks/test_scan_usage.py`: tests
-- `types/index.d.ts`: the `QuotaWindow` and `ModelSpeed` types, and the plugin state declaration
+- `types/index.d.ts`: the quota, context, speed and token types, and the plugin state declaration
 
 Tested with Claude Code 2.1.299.

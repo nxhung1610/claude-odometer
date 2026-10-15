@@ -3,8 +3,9 @@ import { atom, read, update } from 'claude-code'
 
 import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
-import { contextLegend, contextSegments } from './context'
+import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, toneOf } from './format'
+import { LEGEND_SPLIT, contextBar, contextLegend, packLegend, shareOf } from './context'
+import type { BarRun } from './context'
 import { contextAlert, limitAlert, minutesToFull, passed } from './alerts'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
@@ -79,6 +80,8 @@ const sweep = atom(
 )
 
 const PANE = 'tokens'
+// The context card is not drawn narrower than this, once its border and padding are taken off the band.
+const CARD_MIN_INNER = 20
 
 /** The chunks that mean the model has begun to answer; the stop and the engine's own do not. */
 const OUTPUT = new Set<string>(['text', 'thinking', 'tool', 'input'])
@@ -230,10 +233,10 @@ export const register: Register = on => {
     return { text: 'Tokens pane updated.' }
   })
 
-  // Draws the quota on one row of the band directly above the prompt, and the model's
-  // speed on the row beneath it, both aligned left. The band is shared with surveys, so
-  // it yields while one holds it. It sizes to bodyColumns, which keeps clear of the
-  // band's own [-] mark.
+  // Draws the quota on one row of the band directly above the prompt, the model's speed on
+  // the row beneath it, and the context window as a card at the foot of the band, nearest
+  // the prompt. The band is shared with surveys, so it yields while one holds it. It sizes
+  // to bodyColumns, which keeps clear of the band's own [-] mark.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
 
@@ -256,17 +259,25 @@ export const register: Register = on => {
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
-    // The context fill is absent until the session's first response, shown as a dash.
+    // The card is the band's width less its border and padding. The fill is absent until the session's
+    // first response, and again after a compaction: then the card shows a dash and an empty bar.
+    const inner = e.props.bodyColumns - 4
+    const withCard = inner >= CARD_MIN_INNER
     const ctxPercent = fill?.percent === undefined ? null : Math.round(fill.percent)
-    const fillBar = ctxPercent === null ? null : {
-      percent: ctxPercent,
-      cells: barCells(ctxPercent, barWidth),
-      tone: toneOf(ctxPercent),
-      segments: contextSegments(ctxRows ?? [], filledCells(ctxPercent, barWidth)),
-    }
-    // The tokens need 120 columns: the quota row with them is 107 wide, so a narrower band would wrap it.
-    const detail = e.props.bodyColumns >= 120 && fill?.tokens !== undefined ? `${compactTokens(fill.tokens)}/${compactTokens(fill.window)}` : undefined
-    const withContext = e.props.bodyColumns >= 70
+    const ctxTone = ctxPercent === null ? null : toneOf(ctxPercent)
+    const breakdown = ctxRows ?? []
+    const bar: BarRun[] = ctxPercent === null || ctxTone === null
+      ? [{ color: 'subtle', glyph: '─', cells: inner }]
+      : breakdown.length > 0
+        ? contextBar(breakdown, inner)
+        : [
+            { color: ctxTone, glyph: '█', cells: Math.min(inner, filledCells(ctxPercent, inner)) },
+            { color: 'subtle', glyph: '─', cells: Math.max(0, inner - filledCells(ctxPercent, inner)) },
+          ]
+    const legend = ctxPercent !== null && fill !== null && breakdown.length > 0
+      ? packLegend(contextLegend(breakdown), fill.window, inner)
+      : []
+    const tokensText = fill === null || fill.tokens === undefined ? undefined : `${compactTokens(fill.tokens)} of ${compactTokens(fill.window)}`
     const withModel = e.props.bodyColumns >= 90
     const withCost = e.props.bodyColumns >= 100
 
@@ -297,27 +308,6 @@ export const register: Register = on => {
               )
             })
           )}
-          {withContext ? (
-            <Box flexDirection="row">
-              <Text color="inactive">{roomy ? '   ·   ctx ' : ' · ctx '}</Text>
-              {fillBar === null ? (
-                <Text color="inactive">{'—'}</Text>
-              ) : (
-                <Box flexDirection="row">
-                  {fillBar.segments.length > 0 ? (
-                    fillBar.segments.map((segment, index) => (
-                      <Text key={`fill-${index}`} color={segment.color}>{'▓'.repeat(segment.cells)}</Text>
-                    ))
-                  ) : (
-                    <Text color={fillBar.tone}>{fillBar.cells.filled}</Text>
-                  )}
-                  <Text color="subtle">{fillBar.cells.empty}</Text>
-                  <Text color={fillBar.tone}>{` ${fillBar.percent}%`}</Text>
-                  {detail === undefined ? null : <Text color="inactive">{`  ${detail}`}</Text>}
-                </Box>
-              )}
-            </Box>
-          ) : null}
         </Box>
         <Box flexDirection="row">
           <Text color="inactive">{'  '}</Text>
@@ -337,6 +327,42 @@ export const register: Register = on => {
           <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
           {withCost && spend !== null ? <Text color="inactive">{` · ${formatCost(spend)}`}</Text> : null}
         </Box>
+        {withCard ? (
+          <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text wrap="truncate-end">
+                <Text color="claude">{'◆ '}</Text>
+                <Text bold>context</Text>
+              </Text>
+              {ctxPercent === null || ctxTone === null ? (
+                <Text dimColor>{'—'}</Text>
+              ) : (
+                <Text wrap="truncate-start">
+                  {tokensText === undefined ? null : <Text dimColor>{`${tokensText} `}</Text>}
+                  <Text bold color="black" backgroundColor={pillColorOf(ctxTone)}>{` ${ctxPercent}% `}</Text>
+                </Text>
+              )}
+            </Box>
+            <Text>
+              {bar.map((run, index) => (
+                <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+              ))}
+            </Text>
+            {legend.map((items, row) => (
+              <Text key={`legend-${row}`} wrap="truncate-end">
+                {items.map((item, index) => (
+                  <Text key={item.label}>
+                    {index > 0 ? LEGEND_SPLIT : null}
+                    <Text color={item.color}>{`${item.glyph} `}</Text>
+                    <Text dimColor>{`${item.label} `}</Text>
+                    <Text bold>{compactTokens(item.tokens)}</Text>
+                    <Text dimColor>{` ${shareOf(item.tokens, fill?.window ?? 0)}`}</Text>
+                  </Text>
+                ))}
+              </Text>
+            ))}
+          </Box>
+        ) : null}
       </Box>
     )
   })
@@ -379,7 +405,7 @@ export const register: Register = on => {
             <Text bold>{`Context now: ${compactTokens(ctxNow.tokens)} of ${compactTokens(ctxNow.window)}`}</Text>
             <Box flexDirection="row">
               {contextLegend(ctxRowsNow ?? []).map(item => (
-                <Text key={item.label} color={item.color}>{`■ ${item.label} ${compactTokens(item.tokens)}   `}</Text>
+                <Text key={item.label} color={item.color}>{`${item.glyph} ${item.label} ${compactTokens(item.tokens)}   `}</Text>
               ))}
             </Box>
           </Box>

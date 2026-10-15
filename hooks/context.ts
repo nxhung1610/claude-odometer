@@ -1,5 +1,7 @@
 import type { ContextRow } from '../types'
 
+import { compactTokens } from './format'
+
 /** The groups the context bar is split into, each with its colour and the label the tokens pane gives it. */
 export const CONTEXT_GROUPS = [
   { key: 'system', label: 'System', color: '#3987e5' },
@@ -10,6 +12,13 @@ export const CONTEXT_GROUPS = [
 ] as const
 
 export type ContextGroup = (typeof CONTEXT_GROUPS)[number]['key']
+
+/** The buffer auto-compaction keeps back and the free space: the parts of the window that no group holds. */
+const BUFFER = { label: 'Buffer', glyph: '░', color: 'inactive' }
+const FREE = { label: 'Free', glyph: '─', color: 'subtle' }
+/** The glyph of a group in use, and the gap between two items of the legend. */
+const USED_GLYPH = '█'
+export const LEGEND_SPLIT = '   '
 
 /** The group of a used row, by its name as /context prints it. */
 export function groupOf(name: string): ContextGroup {
@@ -29,6 +38,11 @@ function usedByGroup(rows: ContextRow[]): Map<ContextGroup, number> {
     totals.set(key, (totals.get(key) ?? 0) + row.tokens)
   }
   return totals
+}
+
+/** The tokens of the rows of one kind, summed. */
+function sumKind(rows: ContextRow[], kind: ContextRow['kind']): number {
+  return rows.filter(row => row.kind === kind).reduce((sum, row) => sum + row.tokens, 0)
 }
 
 /**
@@ -54,22 +68,80 @@ export function allocateCells(cells: number, weights: number[]): number[] {
   return parts
 }
 
-/** The filled cells of the bar, as runs of one colour each, from the used rows of the breakdown. */
-export function contextSegments(rows: ContextRow[], cells: number): { color: string; cells: number }[] {
+/** One run of the bar: `cells` copies of `glyph`, in `color`. */
+export type BarRun = { color: string; glyph: string; cells: number }
+
+/**
+ * The window as one bar of `width` cells, from left to right: each group in use in its colour, then the buffer,
+ * then the free space. A group in use gets at least one cell, taken from the largest part when rounding leaves none.
+ */
+export function contextBar(rows: ContextRow[], width: number): BarRun[] {
   const totals = usedByGroup(rows)
-  const present = CONTEXT_GROUPS.filter(group => (totals.get(group.key) ?? 0) > 0)
-  const counts = allocateCells(cells, present.map(group => totals.get(group.key) ?? 0))
-  return present.map((group, index) => ({ color: group.color, cells: counts[index] ?? 0 }))
+  const parts = [
+    ...CONTEXT_GROUPS.map(group => ({ color: group.color, glyph: USED_GLYPH, tokens: totals.get(group.key) ?? 0, used: true })),
+    { ...BUFFER, tokens: sumKind(rows, 'buffer'), used: false },
+    { ...FREE, tokens: sumKind(rows, 'free'), used: false },
+  ].filter(part => part.tokens > 0)
+  const cells = allocateCells(width, parts.map(part => part.tokens))
+  parts.forEach((part, index) => {
+    if (!part.used || (cells[index] ?? 0) > 0) return
+    const donor = cells.indexOf(Math.max(...cells))
+    if ((cells[donor] ?? 0) > 1) {
+      cells[donor] = (cells[donor] ?? 0) - 1
+      cells[index] = 1
+    }
+  })
+  return parts
+    .map((part, index) => ({ color: part.color, glyph: part.glyph, cells: cells[index] ?? 0 }))
+    .filter(run => run.cells > 0)
 }
 
-/** What the tokens pane lists under the context: each group in use, then the free space. */
-export function contextLegend(rows: ContextRow[]): { label: string; color: string; tokens: number }[] {
+/** One item of the legend: a group, the buffer, or the free space, with its glyph, its colour and its tokens. */
+export type LegendItem = { label: string; glyph: string; color: string; tokens: number }
+
+/** What the legend lists: each group in use, the buffer when it holds tokens, then the free space. */
+export function contextLegend(rows: ContextRow[]): LegendItem[] {
   const totals = usedByGroup(rows)
-  const free = rows.filter(row => row.kind === 'free').reduce((sum, row) => sum + row.tokens, 0)
   const groups = CONTEXT_GROUPS.filter(group => (totals.get(group.key) ?? 0) > 0).map(group => ({
     label: group.label,
+    glyph: '■',
     color: group.color,
     tokens: totals.get(group.key) ?? 0,
   }))
-  return [...groups, { label: 'Free', color: 'inactive', tokens: free }]
+  const buffer = sumKind(rows, 'buffer')
+  return [
+    ...groups,
+    ...(buffer > 0 ? [{ ...BUFFER, tokens: buffer }] : []),
+    { ...FREE, tokens: sumKind(rows, 'free') },
+  ]
+}
+
+/** A share of the window as a whole percent, or `<1%` for tokens that are under one percent of it. */
+export function shareOf(tokens: number, window: number): string {
+  const percent = window > 0 ? (tokens / window) * 100 : 0
+  if (percent > 0 && percent < 1) return '<1%'
+  return `${Math.round(percent)}%`
+}
+
+/** One legend item as the band writes it, e.g. `■ System 10k 5%`. */
+function legendText(item: LegendItem, window: number): string {
+  return `${item.glyph} ${item.label} ${compactTokens(item.tokens)} ${shareOf(item.tokens, window)}`
+}
+
+/** The legend packed into lines no wider than `width`: an item that would overflow starts the next line. */
+export function packLegend(items: LegendItem[], window: number, width: number): LegendItem[][] {
+  const lines: LegendItem[][] = []
+  let used = 0
+  for (const item of items) {
+    const size = legendText(item, window).length
+    const last = lines[lines.length - 1]
+    if (last !== undefined && used + LEGEND_SPLIT.length + size <= width) {
+      last.push(item)
+      used += LEGEND_SPLIT.length + size
+    } else {
+      lines.push([item])
+      used = size
+    }
+  }
+  return lines
 }
