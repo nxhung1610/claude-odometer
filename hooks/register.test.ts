@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { CommandSpec, On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 const NOW = new Date(2026, 9, 14, 12, 0)
@@ -30,7 +30,8 @@ const TOKENS = {
   presentation: { isFullscreen: true, columns: 140 },
 }
 const SCAN = {
-  sessions: 2,
+  root: '/home/me/.claude/projects',
+  sessionsByDay: { [TODAY]: ['session-a', 'session-b'] },
   days: { [TODAY]: { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 } } },
 }
 
@@ -39,13 +40,16 @@ type RateWindow = { kind: string; percentUsed: number; resetsAt?: string }
 /**
  * What the engine answers beneath the mod, which a test gives itself: a session
  * with these rate-limit windows, and the commands and panes the mod registers
- * and opens.
+ * and opens. Each command the mod registers is pushed onto `commands`.
  */
-function engine(on: On, rateLimits: RateWindow[] = []) {
+function engine(on: On, rateLimits: RateWindow[] = [], commands: CommandSpec[] = []) {
   on('session.start', () => ({ cwd: '/tmp' }))
   on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context: { window: 200_000 }, rateLimits } }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
-  on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('command.register', (_, e) => {
+    commands.push(e)
+    return { value: { command: e.name } }
+  })
   on('ui.open', () => ({ value: { isPlaced: true } }))
 }
 
@@ -85,6 +89,15 @@ test('session start reads the rate-limit windows into the quota line', async ($,
   expect(await ui.find({ type: 'Text', text: '↻ 14:20' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /↻ \w{3} 14:00/ })).toBeDefined()
   await ui.unmount()
+})
+
+test('/tokens is registered to run at once when typed mid-turn', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  const commands: CommandSpec[] = []
+  engine(on, [], commands)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  expect(commands.find(command => command.name === 'tokens')?.immediate).toBe(true)
 })
 
 test('a rate-limit change moves the quota line to the new reading', async ($, on) => {
@@ -167,7 +180,7 @@ test('the chart axis runs from the first day of the range to the last', async ($
   mock.clock(on, { now: NOW.getTime() })
   engine(on)
   const old = { 'claude-opus-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } }
-  withPython(on, () => ran(0, JSON.stringify({ sessions: 1, days: { '2026-03-01': old } })))
+  withPython(on, () => ran(0, JSON.stringify({ sessionsByDay: { '2026-03-01': ['session-old'] }, days: { '2026-03-01': old } })))
   await $.command.run(TOKENS)
 
   // Narrow enough that the 228 days of "all time" are grouped into columns.
@@ -185,6 +198,66 @@ test('a scan that fails says why, with the first line of its error', async ($, o
 
   const ui = await $.ui.mount(TOKENS_PANE)
   expect(await ui.find({ type: 'Text', text: 'Could not read the transcripts: python3: command not found' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the footer counts the sessions in the range shown, and all time counts every session', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  withPython(on, () => ran(0, JSON.stringify({
+    sessionsByDay: { [TODAY]: ['session-a', 'session-b'], '2026-03-01': ['session-old'] },
+    days: {
+      [TODAY]: { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 } },
+      '2026-03-01': { 'claude-opus-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } },
+    },
+  })))
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: '360 tokens across 2 sessions' })).toBeDefined()
+  await ui.press({ key: 'all' })
+  expect(await ui.find({ type: 'Text', text: '361 tokens across 3 sessions' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the footer says session in the singular for one session', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  withPython(on, () => ran(0, JSON.stringify({
+    root: '/home/me/.claude/projects',
+    sessionsByDay: { [TODAY]: ['session-a'] },
+    days: { [TODAY]: { 'claude-opus-5-5': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 } } },
+  })))
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: '360 tokens across 1 session.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a range with no tokens says so when other days have usage', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  withPython(on, () => ran(0, JSON.stringify({
+    root: '/home/me/.claude/projects',
+    sessionsByDay: { '2026-03-01': ['session-old'] },
+    days: { '2026-03-01': { 'claude-opus-5-5': { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } } },
+  })))
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: 'No tokens in this range.' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a folder with no transcripts that have usage says where it looked', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  withPython(on, () => ran(0, JSON.stringify({ root: '/custom/projects', sessionsByDay: {}, days: {} })))
+  await $.command.run(TOKENS)
+
+  const ui = await $.ui.mount(TOKENS_PANE)
+  expect(await ui.find({ type: 'Text', text: 'No transcripts with usage found in /custom/projects.' })).toBeDefined()
   await ui.unmount()
 })
 
