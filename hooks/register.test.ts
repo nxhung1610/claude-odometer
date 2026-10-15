@@ -620,6 +620,22 @@ test('the context bar takes one colour per group in use, and the free space a th
   await ui.unmount()
 })
 
+test('the bars are set in the code font, so a glyph fills the cell the layout counts for it, on every surface', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [{ kind: 'five_hour', percentUsed: 23 }], [], CONTEXT_IN_USE)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...QUOTA, surface })
+    // Anchored, so a query finds the run itself and not the Text that holds the whole bar on the terminal.
+    expect(await ui.find({ type: 'Text', text: /^██$/ })).toMatchObject({ props: { mono: true } }) // the quota: 23% of its 10 cells
+    expect(await ui.find({ type: 'Text', text: /^─{8}$/ })).toMatchObject({ props: { mono: true } })
+    expect(await ui.find({ type: 'Text', text: /^█{7}$/ })).toMatchObject({ props: { mono: true } }) // the system prompt's part
+    expect(await ui.find({ type: 'Text', text: /^─{81}$/ })).toMatchObject({ props: { mono: true } }) // the free space
+    await ui.unmount()
+  }
+})
+
 test('the tokens pane says how much context is in use, and what it holds', async ($, on) => {
   mock.clock(on, { now: NOW.getTime() })
   engine(on, [], [], CONTEXT_IN_USE)

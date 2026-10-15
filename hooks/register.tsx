@@ -311,6 +311,8 @@ export const register: Register = on => {
         <Text bold>quota</Text>
       </Box>
     )
+    // The bars are set in the code font (`mono`), the face the layout counts their cells in: the UI font draws a
+    // block or line wider than a cell, so a part of the context bar would wrap its run onto lines above and below it.
     const quotaWindows = (
       <Box flexDirection="row">
         {rows.length === 0 ? (
@@ -326,8 +328,8 @@ export const register: Register = on => {
               <Box key={w.kind} flexDirection="row">
                 {i === 0 ? null : <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text>}
                 <Text color="inactive">{`${labelOf(w.kind)} `}</Text>
-                <Text color={tone}>{cells.filled}</Text>
-                <Text color="subtle">{cells.empty}</Text>
+                <Text color={tone} mono>{cells.filled}</Text>
+                <Text color="subtle" mono>{cells.empty}</Text>
                 <Text bold color="black" backgroundColor={pillColorOf(tone)}>{` ${percent}% `}</Text>
                 {resetShown[i] && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
               </Box>
@@ -389,7 +391,7 @@ export const register: Register = on => {
               <Box flexDirection="row">
                 {parts.map(({ run, index, item, hangRight }) => (
                   <Box key={`part-${index}`} width={run.cells} overflow="visible">
-                    <Text color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+                    <Text color={run.color} mono>{run.glyph.repeat(run.cells)}</Text>
                     {item === undefined ? null : (
                       <Box
                         position="absolute"
@@ -413,7 +415,7 @@ export const register: Register = on => {
             ) : (
               <Text>
                 {bar.map((run, index) => (
-                  <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+                  <Text key={`bar-${index}`} color={run.color} mono>{run.glyph.repeat(run.cells)}</Text>
                 ))}
               </Text>
             )}
