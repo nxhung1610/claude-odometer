@@ -60,6 +60,8 @@ declare module 'claude-code' {
       timing: ModelSpeed | null
       /** Frames drawn while a model step runs; the light on the word `working` moves with it. */
       sweep: number
+      /** The context window's fill as a whole percentage, once a response of the live window reported one. */
+      context: number | null
     }
   }
 }

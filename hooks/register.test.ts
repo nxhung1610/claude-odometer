@@ -38,14 +38,16 @@ const SCAN = {
 
 type RateWindow = { kind: string; percentUsed: number; resetsAt?: string }
 
+type ContextReading = { window: number; percent?: number }
+
 /**
  * What the engine answers beneath the mod, which a test gives itself: a session
  * with these rate-limit windows, and the commands and panes the mod registers
  * and opens. Each command the mod registers is pushed onto `commands`.
  */
-function engine(on: On, rateLimits: RateWindow[] = [], commands: CommandSpec[] = []) {
+function engine(on: On, rateLimits: RateWindow[] = [], commands: CommandSpec[] = [], context: ContextReading = { window: 200_000 }) {
   on('session.start', () => ({ cwd: '/tmp' }))
-  on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context: { window: 200_000 }, rateLimits } }))
+  on('session.usage', () => ({ value: { startedAt: NOW.getTime(), context, rateLimits } }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('command.register', (_, e) => {
     commands.push(e)
@@ -282,6 +284,81 @@ test('a wide band draws the quota with a 10-cell bar', async ($, on) => {
   const ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 100 } })
   // 23% of 10 cells is two filled cells, so eight stay empty.
   expect(await ui.find({ type: 'Text', text: '░░░░░░░░' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('session start shows the context fill on the speed row, with a dash before the first response', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on)
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /ctx / })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^—$/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the context fill is green below 70%, amber from 70% and red from 90%', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000, percent: 69 })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  let ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: ' 69%' })).toMatchObject({ props: { color: 'success' } })
+  await ui.unmount()
+
+  await $.session.measure({ context: { window: 200_000, percent: 70 }, rateLimits: [], changed: ['context'] })
+  ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: ' 70%' })).toMatchObject({ props: { color: 'warning' } })
+  await ui.unmount()
+
+  await $.session.measure({ context: { window: 200_000, percent: 90 }, rateLimits: [], changed: ['context'] })
+  ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: ' 90%' })).toMatchObject({ props: { color: 'error' } })
+  await ui.unmount()
+})
+
+test('a context change moves the speed row to the new fill', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000, percent: 30 })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  await $.session.measure({
+    context: { window: 200_000, percent: 92 },
+    rateLimits: [],
+    changed: ['context'],
+  })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: ' 92%' })).toMatchObject({ props: { color: 'error' } })
+  expect(await ui.find({ type: 'Text', text: ' 30%' })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('the context fill shows from 70 columns, and stays off below', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000, percent: 30 })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  let ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 69 } })
+  expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeUndefined()
+  await ui.unmount()
+
+  ui = await $.ui.mount({ ...QUOTA, props: { ...BAND, bodyColumns: 70 } })
+  expect(await ui.find({ type: 'Text', text: /ctx/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('after a compaction the context fill is a dash again, until the next response', async ($, on) => {
+  mock.clock(on, { now: NOW.getTime() })
+  engine(on, [], [], { window: 200_000, percent: 45 })
+  await $.session.start({ cwd: '/tmp', surface: TERMINAL, isInteractive: true })
+
+  await $.session.measure({ context: { window: 200_000 }, rateLimits: [], changed: ['context'] })
+
+  const ui = await $.ui.mount(QUOTA)
+  expect(await ui.find({ type: 'Text', text: /^—$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' 45%' })).toBeUndefined()
   await ui.unmount()
 })
 

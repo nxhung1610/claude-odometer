@@ -27,6 +27,11 @@ const windows = atom(
   [] as QuotaWindow[],
 )
 
+const context = atom(
+  { plugin: 'odometer', key: 'context' } as const,
+  null as number | null,
+)
+
 const tokens = atom(
   { plugin: 'odometer', key: 'tokens' } as const,
   { status: 'idle' } as TokenScanState,
@@ -77,6 +82,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const reading = await $.session.usage()
     await update($, windows, () => reading.rateLimits)
+    await update($, context, () => reading.context.percent ?? null)
     // Runs at once when typed mid-turn: it reads the transcripts on disk, not the turn's state.
     await $.command.register({
       name: 'tokens',
@@ -87,10 +93,11 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Pushed by the engine when a window moves a whole point, so the line
-  // refreshes without polling.
+  // Pushed by the engine when a window moves a whole point or the context fill moves, so the
+  // line refreshes without polling.
   on('session.measure', async ($, e, next) => {
     await update($, windows, () => e.rateLimits)
+    await update($, context, () => e.context.percent ?? null)
 
     return next(e)
   })
@@ -179,6 +186,11 @@ export const register: Register = on => {
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
+    // The context fill is absent until the session's first response, shown as a dash.
+    const fill = await read($, context)
+    const percent = fill === null ? null : Math.round(fill)
+    const fillBar = percent === null ? null : { percent, cells: barCells(percent, barWidth), tone: toneOf(percent) }
+    const withContext = e.props.bodyColumns >= 70
 
     return (
       <Box flexDirection="column" marginTop={1}>
@@ -218,6 +230,20 @@ export const register: Register = on => {
             ))
           ) : null}
           <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
+          {withContext ? (
+            <Box flexDirection="row">
+              <Text color="inactive">{roomy ? '   ·   ctx ' : ' · ctx '}</Text>
+              {fillBar === null ? (
+                <Text color="inactive">{'—'}</Text>
+              ) : (
+                <Box flexDirection="row">
+                  <Text color={fillBar.tone}>{fillBar.cells.filled}</Text>
+                  <Text color="subtle">{fillBar.cells.empty}</Text>
+                  <Text color={fillBar.tone}>{` ${fillBar.percent}%`}</Text>
+                </Box>
+              )}
+            </Box>
+          ) : null}
         </Box>
       </Box>
     )
