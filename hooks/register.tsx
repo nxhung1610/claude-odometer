@@ -3,7 +3,7 @@ import { atom, read, update } from 'claude-code'
 
 import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, resetsThatFit, toneOf } from './format'
+import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetIn, resetsThatFit, toneOf } from './format'
 import { LEGEND_SPLIT, contextBar, contextLegend, packLegend, shareOf } from './context'
 import type { BarRun } from './context'
 import { desktopBand } from './band'
@@ -281,14 +281,18 @@ export const register: Register = on => {
     // first response, and again after a compaction: then the card shows a dash and an empty bar.
     const inner = e.props.bodyColumns - 4
     const withCard = inner >= CARD_MIN_INNER
-    const ctxPercent = fill?.percent === undefined ? null : Math.round(fill.percent)
-    const ctxTone = ctxPercent === null ? null : toneOf(ctxPercent)
     const breakdown = ctxRows ?? []
+    // Before the first response the engine reports no fill, but the breakdown the session starts with already counts the
+    // tokens in use. The fill is worked out from it then, so the card shows its parts at once.
+    const usedTokens = breakdown.reduce((sum, row) => (row.kind === 'used' ? sum + row.tokens : sum), 0)
+    const estimated = fill !== null && fill.window > 0 && usedTokens > 0 ? Math.round((usedTokens / fill.window) * 100) : null
+    const ctxPercent = fill?.percent === undefined ? estimated : Math.round(fill.percent)
+    const ctxTone = ctxPercent === null ? null : toneOf(ctxPercent)
     // The fill alone, when there is no part of the window to draw: a dash before the first response, else filled cells.
     const fillBar: BarRun[] = ctxPercent === null || ctxTone === null
       ? [{ color: 'subtle', glyph: '─', cells: inner }]
       : [
-          { color: ctxTone, glyph: '█', cells: Math.min(inner, filledCells(ctxPercent, inner)) },
+          { color: 'claude', glyph: '█', cells: Math.min(inner, filledCells(ctxPercent, inner)) },
           { color: 'subtle', glyph: '─', cells: Math.max(0, inner - filledCells(ctxPercent, inner)) },
         ]
     // The parts of the window, once the breakdown has tokens to show: an all-zero breakdown would leave the bar empty.
@@ -296,7 +300,9 @@ export const register: Register = on => {
     const bar: BarRun[] = rowBar.length > 0 ? rowBar : fillBar
     // The legend sits under the bar, which the terminal draws as text.
     const legendLines = rowBar.length > 0 ? packLegend(contextLegend(breakdown), fill?.window ?? 0, inner) : []
-    const tokensText = fill === null || fill.tokens === undefined ? undefined : `${compactTokens(fill.tokens)} of ${compactTokens(fill.window)}`
+    // The tokens against the window: the last response's, or the breakdown's until a response reports them.
+    const shownTokens = fill?.tokens ?? (estimated === null ? undefined : usedTokens)
+    const tokensText = fill === null || shownTokens === undefined ? undefined : `${compactTokens(shownTokens)} of ${compactTokens(fill.window)}`
     const withModel = e.props.bodyColumns >= 90
     const withCost = e.props.bodyColumns >= 100
 
@@ -306,7 +312,7 @@ export const register: Register = on => {
     const windowParts = rows.map(w => ({
       label: labelOf(w.kind),
       badge: ` ${Math.round(w.percentUsed)}% `,
-      reset: withReset ? resetLabel(w.resetsAt, now) : '',
+      reset: withReset ? resetIn(w.resetsAt, now) : '',
     }))
     const resetShown = resetsThatFit(windowParts, inner, barWidth, roomy)
     const quotaHeader = (
@@ -324,15 +330,15 @@ export const register: Register = on => {
             const percent = Math.round(w.percentUsed)
             const tone = toneOf(percent)
             const cells = barCells(percent, barWidth)
-            const reset = resetLabel(w.resetsAt, now)
+            const reset = resetIn(w.resetsAt, now)
 
             return (
               <Box key={w.kind} flexDirection="row">
                 {i === 0 ? null : <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text>}
                 <Text color="inactive">{`${labelOf(w.kind)} `}</Text>
-                <Text color={tone}>{cells.filled}</Text>
+                <Text color="claude">{cells.filled}</Text>
                 <Text color="subtle">{cells.empty}</Text>
-                <Text bold color="black" backgroundColor={pillColorOf(tone)}>{` ${percent}% `}</Text>
+                <Text bold color={tone}>{` ${percent}% `}</Text>
                 {resetShown[i] && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
               </Box>
             )
@@ -381,19 +387,23 @@ export const register: Register = on => {
                 <Text bold>context</Text>
               </Text>
               {ctxPercent === null || ctxTone === null ? (
-                <Text dimColor>{'—'}</Text>
+                <Text dimColor>{fill === null ? '—' : `— of ${compactTokens(fill.window)}`}</Text>
               ) : (
                 <Text wrap="truncate-start">
                   {tokensText === undefined ? null : <Text dimColor>{`${tokensText} `}</Text>}
-                  <Text bold color="black" backgroundColor={pillColorOf(ctxTone)}>{` ${ctxPercent}% `}</Text>
+                  <Text bold color={ctxTone}>{` ${ctxPercent}% `}</Text>
                 </Text>
               )}
             </Box>
-            <Text>
-              {bar.map((run, index) => (
-                <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
-              ))}
-            </Text>
+            {ctxPercent === null ? (
+              <Text dimColor wrap="truncate-end">{'the parts appear after the first response'}</Text>
+            ) : (
+              <Text>
+                {bar.map((run, index) => (
+                  <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
+                ))}
+              </Text>
+            )}
             {legendLines.map((items, row) => (
               <Text key={`legend-${row}`} wrap="truncate-end">
                 {items.map((item, index) => (
