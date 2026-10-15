@@ -1,9 +1,9 @@
 import type { Register } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
+import type { ContextFill, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, labelOf, resetLabel, toneOf } from './format'
+import { BAR_WIDTH, barCells, compactTokens, formatCost, labelOf, resetLabel, toneOf } from './format'
 import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
 import {
   CHART_ROWS,
@@ -29,6 +29,16 @@ const windows = atom(
 
 const context = atom(
   { plugin: 'odometer', key: 'context' } as const,
+  null as ContextFill | null,
+)
+
+const model = atom(
+  { plugin: 'odometer', key: 'model' } as const,
+  null as ModelInUse | null,
+)
+
+const cost = atom(
+  { plugin: 'odometer', key: 'cost' } as const,
   null as number | null,
 )
 
@@ -82,7 +92,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const reading = await $.session.usage()
     await update($, windows, () => reading.rateLimits)
-    await update($, context, () => reading.context.percent ?? null)
+    await update($, context, () => reading.context)
+    await update($, cost, () => reading.cost?.usd ?? null)
     // Runs at once when typed mid-turn: it reads the transcripts on disk, not the turn's state.
     await $.command.register({
       name: 'tokens',
@@ -97,7 +108,8 @@ export const register: Register = on => {
   // line refreshes without polling.
   on('session.measure', async ($, e, next) => {
     await update($, windows, () => e.rateLimits)
-    await update($, context, () => e.context.percent ?? null)
+    await update($, context, () => e.context)
+    await update($, cost, () => e.cost?.usd ?? null)
 
     return next(e)
   })
@@ -112,6 +124,7 @@ export const register: Register = on => {
 
     const startedAt = await $.clock.now()
     await update($, timing, speed => applyStep(speed, { kind: 'start', at: startedAt }))
+    await update($, model, () => ({ model: e.model, effort: e.effort === undefined ? undefined : String(e.effort) }))
     // Each frame, the band redraws: the elapsed seconds count up and the light moves on.
     const tick = $.clock.every(FRAME_MS, () => {
       update($, sweep, frames => (frames ?? 0) + 1).catch(() => undefined)
@@ -188,9 +201,15 @@ export const register: Register = on => {
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
     // The context fill is absent until the session's first response, shown as a dash.
     const fill = await read($, context)
-    const percent = fill === null ? null : Math.round(fill)
-    const fillBar = percent === null ? null : { percent, cells: barCells(percent, barWidth), tone: toneOf(percent) }
+    const ctxPercent = fill?.percent === undefined ? null : Math.round(fill.percent)
+    const fillBar = ctxPercent === null ? null : { percent: ctxPercent, cells: barCells(ctxPercent, barWidth), tone: toneOf(ctxPercent) }
+    // The tokens need 120 columns: the quota row with them is 107 wide, so a narrower band would wrap it.
+    const detail = e.props.bodyColumns >= 120 && fill?.tokens !== undefined ? `${compactTokens(fill.tokens)}/${compactTokens(fill.window)}` : undefined
     const withContext = e.props.bodyColumns >= 70
+    const modelInUse = await read($, model)
+    const spend = await read($, cost)
+    const withModel = e.props.bodyColumns >= 90
+    const withCost = e.props.bodyColumns >= 100
 
     return (
       <Box flexDirection="column" marginTop={1}>
@@ -219,17 +238,6 @@ export const register: Register = on => {
               )
             })
           )}
-        </Box>
-        <Box flexDirection="row">
-          <Text color="inactive">{'  '}</Text>
-          {running ? (
-            [...WORKING].map((letter, i) => (
-              <Text key={`letter-${i}`} color={i === lit ? 'claude' : 'inactive'} bold={i === lit}>
-                {letter}
-              </Text>
-            ))
-          ) : null}
-          <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
           {withContext ? (
             <Box flexDirection="row">
               <Text color="inactive">{roomy ? '   ·   ctx ' : ' · ctx '}</Text>
@@ -240,10 +248,29 @@ export const register: Register = on => {
                   <Text color={fillBar.tone}>{fillBar.cells.filled}</Text>
                   <Text color="subtle">{fillBar.cells.empty}</Text>
                   <Text color={fillBar.tone}>{` ${fillBar.percent}%`}</Text>
+                  {detail === undefined ? null : <Text color="inactive">{`  ${detail}`}</Text>}
                 </Box>
               )}
             </Box>
           ) : null}
+        </Box>
+        <Box flexDirection="row">
+          <Text color="inactive">{'  '}</Text>
+          {withModel && modelInUse !== null ? (
+            <Box flexDirection="row">
+              <Text color="claude">{modelName(modelInUse.model)}</Text>
+              <Text color="inactive">{modelInUse.effort === undefined ? ' · ' : ` (${modelInUse.effort}) · `}</Text>
+            </Box>
+          ) : null}
+          {running ? (
+            [...WORKING].map((letter, i) => (
+              <Text key={`letter-${i}`} color={i === lit ? 'claude' : 'inactive'} bold={i === lit}>
+                {letter}
+              </Text>
+            ))
+          ) : null}
+          <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
+          {withCost && spend !== null ? <Text color="inactive">{` · ${formatCost(spend)}`}</Text> : null}
         </Box>
       </Box>
     )

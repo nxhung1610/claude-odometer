@@ -8,10 +8,9 @@ A Claude Code mod that shows your account's 5-hour and 7-day usage limits on a l
 
 ## What it shows
 
-**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time.
+**Quota.** Green under 70%, amber from 70%, red from 90%. `↻` marks the reset time: just the time if it is later today, otherwise the weekday and time. The row ends with the context window's fill as `ctx`, with the same thresholds. It shows `—` until the session's first response, and again after a compaction until the next response. On a wide band it also shows the tokens against the window, like `92k/200k`.
 
-**Speed.** The row beneath the quota shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The end of the row shows the context window's fill as `ctx`, with the quota's thresholds: amber from 70%, red from 90%. It shows `—` until the session's first response, and again after a compaction until the next response.
-
+**Speed.** The row beneath the quota shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The row starts with that model and its effort, and on a wide band ends with the session's cost, as `/cost` totals it.
 ![While a step runs, a light moves across the word working, one letter at a time](docs/speed.svg)
 
 **`/tokens`.** A pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It reads your transcripts; the numbers in the image are example data.
@@ -53,10 +52,10 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 ## How it works
 
-- `session.start` reads the current rate-limit windows and the context fill.
-- `session.measure` updates them when the engine reports a change in a window or in the context fill.
-- `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, and the model's speed and the context fill on the row beneath. The band yields while a survey holds it.
-- `turn.step` times each model step of the main conversation; a sub-agent's steps pass on untimed, since sub-agents can run alongside it and the row has one timing slot. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
+- `session.start` reads the current rate-limit windows, the context fill and the session's cost.
+- `session.measure` updates them when the engine reports a change in a window, in the context fill or in the cost.
+- `ui.render` on `AbovePrompt` draws the quota on one row of the band above the prompt, with the context fill at its end, and the model's speed on the row beneath. The band yields while a survey holds it.
+- `turn.step` times each model step of the main conversation; a sub-agent's steps pass on untimed, since sub-agents can run alongside it and the row has one timing slot. It records the model and effort each one asked for. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
 - `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `$CLAUDE_CONFIG_DIR/projects`, or in `~/.claude/projects` when that variable is unset or empty. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp, plus, per day, the session ids (the transcript names), with a sub-agent's usage under the session that spawned it, so each range can count its sessions; it sends nothing anywhere.
 
 ## Files

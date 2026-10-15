@@ -48,6 +48,18 @@ export function resetLabel(resetsAt: string | undefined, now: Date): string {
   return isToday ? time : `${DAYS[at.getDay()]} ${time}`
 }
 
+/** `92k`, `1.2M`: a token count in few enough characters to sit on the quota row. */
+export function compactTokens(count: number): string {
+  if (count >= 1e6) return `${(count / 1e6).toFixed(1)}M`
+  return `${Math.round(count / 1e3)}k`
+}
+
+/** `$1.24`; a spend under a cent reads as `<$0.01`. */
+export function formatCost(usd: number): string {
+  if (usd > 0 && usd < 0.01) return '<$0.01'
+  return `$${usd.toFixed(2)}`
+}
+
 function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
