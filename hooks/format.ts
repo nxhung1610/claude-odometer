@@ -22,6 +22,13 @@ export function toneOf(percent: number): Tone {
   return 'success'
 }
 
+/** The background of the context's percentage badge, in the same three steps as its tone. */
+export function pillColorOf(tone: Tone): string {
+  if (tone === 'error') return 'red'
+  if (tone === 'warning') return 'yellow'
+  return 'green'
+}
+
 /** How many of the bar's cells are filled for a percentage. */
 export function filledCells(percent: number, width = BAR_WIDTH): number {
   const clamped = Math.min(100, Math.max(0, percent))
@@ -48,10 +55,11 @@ export function resetLabel(resetsAt: string | undefined, now: Date): string {
   return isToday ? time : `${DAYS[at.getDay()]} ${time}`
 }
 
-/** `92k`, `1.2M`: a token count in few enough characters to sit on the quota row. */
+/** `364`, `92k`, `1.2M`: a token count in few enough characters to sit on the quota row. */
 export function compactTokens(count: number): string {
   if (count >= 1e6) return `${(count / 1e6).toFixed(1)}M`
-  return `${Math.round(count / 1e3)}k`
+  if (count >= 1e3) return `${Math.round(count / 1e3)}k`
+  return String(Math.round(count))
 }
 
 /** `$1.24`; a spend under a cent reads as `<$0.01`. */

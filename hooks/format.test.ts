@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetLabel, toneOf } from './format'
+import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, pillColorOf, resetLabel, toneOf } from './format'
 
 test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(0)).toBe(0)
@@ -39,6 +39,7 @@ test('a token count reads in k, or in M from a million', () => {
   expect(compactTokens(92_000)).toBe('92k')
   expect(compactTokens(200_000)).toBe('200k')
   expect(compactTokens(1_200_000)).toBe('1.2M')
+  expect(compactTokens(364)).toBe('364')
 })
 
 test('text longer than its limit is cut with an ellipsis', () => {
@@ -50,4 +51,10 @@ test('a cost reads in dollars, and under a cent as less than one cent', () => {
   expect(formatCost(1.236)).toBe('$1.24')
   expect(formatCost(0)).toBe('$0.00')
   expect(formatCost(0.004)).toBe('<$0.01')
+})
+
+test('the context badge is green under 70%, yellow from 70% and red from 90%', () => {
+  expect(pillColorOf(toneOf(69))).toBe('green')
+  expect(pillColorOf(toneOf(70))).toBe('yellow')
+  expect(pillColorOf(toneOf(90))).toBe('red')
 })
