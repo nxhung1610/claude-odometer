@@ -95,10 +95,14 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Times each model step. A step starts when its stream does; its time to first output
-  // is the wait for its first chunk of text, thinking, a tool call or its input; and its
-  // stop carries the output tokens. The steps pass on unchanged.
+  // Times each model step of the main conversation. A step starts when its stream does; its
+  // time to first output is the wait for its first chunk of text, thinking, a tool call or its
+  // input; and its stop carries the output tokens. The steps pass on unchanged. A sub-agent's
+  // steps pass on untimed: sub-agents can run alongside the main conversation and each other,
+  // and the row has one timing slot, so their steps would overwrite each other's readings.
   on('turn.step', async function* ($, e, next) {
+    if (e.agentId) return yield* next(e)
+
     const startedAt = await $.clock.now()
     await update($, timing, speed => applyStep(speed, { kind: 'start', at: startedAt }))
     // Each frame, the band redraws: the elapsed seconds count up and the light moves on.
