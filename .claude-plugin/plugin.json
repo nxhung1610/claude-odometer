@@ -1,6 +1,6 @@
 {
   "name": "odometer",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "Shows the account's 5-hour and 7-day usage limits above the prompt, with the last turn's speed, and a /tokens pane.",
   "author": { "name": "nxhung" },
   "types": "./types/index.d.ts"
