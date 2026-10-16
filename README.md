@@ -22,6 +22,14 @@ A Claude Code mod that shows, right above the prompt, a card with your account's
 
 ![The /tokens pane in the terminal: the context in use, a stacked column chart of tokens per day, and the heatmap of hours](docs/tokens.svg)
 
+## On the desktop app
+
+The desktop app draws the band and the `/tokens` pane with its own elements, not characters. These two images are drawn from the element tree the plugin gives the desktop surface, with example data. Their sizes and spacing are estimates, so the app's own rendering will differ.
+
+![The band on the desktop app: the speed row above a card with the quota, its windows as solid bars](docs/desktop-band.svg)
+
+![The /tokens pane on the desktop app: the context in use, the range buttons, the total, the chart, a bar per model and the heatmap of hours](docs/desktop-pane.svg)
+
 ## Install
 
 In a terminal Claude Code session, version 2.1.275 or later, type:
@@ -53,7 +61,7 @@ python3 -m unittest discover -s hooks -p 'test_*.py'  # the transcript scanner's
 
 The plugin is named `odometer` in `plugin.json`. The repository is `claude-odometer`, but a third-party plugin name cannot start with `claude-`. The state the mod keeps is stored under the plugin's name.
 
-CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the scanner tests on Ubuntu and Windows, on pull requests and on pushes to `main`, with Claude Code 2.1.299. It also checks that `package.json` and `plugin.json` agree on the version, that the installer prints its command, and that the illustrations match `docs/gen-visuals.mjs`.
+CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the scanner tests on Ubuntu and Windows, on pull requests and on pushes to `main`, with Claude Code 2.1.299. It also checks that `package.json` and `plugin.json` agree on the version, that the installer prints its command, and that the illustrations match their scripts in `docs/`.
 
 ## How it works
 
@@ -69,6 +77,8 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 - `bin/install.js`, `package.json`: an installer that runs the install line above through the Claude Code CLI, and its npm metadata
 - `docs/*.svg`: the illustrations above; the numbers in the tokens pane are example data
 - `docs/gen-visuals.mjs`: draws those illustrations, with `node docs/gen-visuals.mjs`
+- `docs/desktop-band.json`, `docs/desktop-pane.json`: the element trees the desktop images are drawn from
+- `docs/render-desktop.mjs`: draws the desktop images, with `node docs/render-desktop.mjs`
 - `hooks/register.tsx`: hooks, the speed row and the card above the prompt in the terminal, with the quota and the context, the toasts, and the terminal's `/tokens` pane
 - `hooks/band.tsx`: the band on the desktop app, with the quota as solid bars and the large percentages
 - `hooks/pane.tsx`: the `/tokens` pane on the desktop app, with solid columns, a bar per model, and the heatmap
