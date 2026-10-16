@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetIn, resetLabel, resetsThatFit, toneOf } from './format'
+import { barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetIn, resetLabel, resetsThatFit, timeOfDay, toneOf } from './format'
 
 test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(0)).toBe(0)
@@ -9,6 +9,11 @@ test('the bar fills in proportion to the percentage', () => {
   expect(filledCells(91)).toBe(9)
   expect(filledCells(150)).toBe(10)
   expect(barCells(23).filled.length + barCells(23).empty.length).toBe(10)
+})
+
+test('a moment reads as its local time of day', () => {
+  expect(timeOfDay(new Date(2026, 9, 16, 19, 5).getTime())).toBe('19:05')
+  expect(timeOfDay(new Date(2026, 9, 16, 0, 0).getTime())).toBe('00:00')
 })
 
 test('the tone follows the thresholds', () => {

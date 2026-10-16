@@ -3,4 +3,6 @@
 
 node_modules/
 __pycache__/
+# The transcript scan's cache, written by the mod beside its files
+.cache/
 .DS_Store
