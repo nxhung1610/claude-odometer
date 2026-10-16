@@ -57,9 +57,10 @@ jobs:
         shell: bash
         run: node bin/install.js --print
 
-      - name: Check the illustrations match their script
+      - name: Check the illustrations match their scripts
         if: runner.os == 'Linux'
         shell: bash
         run: |
           node docs/gen-visuals.mjs
+          node docs/render-desktop.mjs
           git diff --exit-code -- docs/
