@@ -40,13 +40,13 @@ class ScanUsageTest(unittest.TestCase):
         with open(file, "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines))
 
-    def scan(self, **extra):
-        """Runs the scanner with the fake home and reads what it prints. CLAUDE_CONFIG_DIR is left out of the
-        environment, so a developer's own setting cannot move the folder the tests read."""
+    def scan(self, args=(), **extra):
+        """Runs the scanner with the fake home, with any arguments given, and reads what it prints. CLAUDE_CONFIG_DIR is
+        left out of the environment, so a developer's own setting cannot move the folder the tests read."""
         env = {key: value for key, value in os.environ.items() if key != "CLAUDE_CONFIG_DIR"}
         env.update(HOME=self.home.name, USERPROFILE=self.home.name, **extra)
         ran = subprocess.run(
-            [sys.executable, "-I", SCRIPT], env=env, capture_output=True, text=True, check=True
+            [sys.executable, "-I", SCRIPT, *args], env=env, capture_output=True, text=True, check=True
         )
         return json.loads(ran.stdout)
 
@@ -161,6 +161,75 @@ class ScanUsageTest(unittest.TestCase):
 
         self.assertEqual(self.scan()["sessions"]["all"], 1)
 
+    def test_a_scan_with_a_cache_prints_what_a_scan_without_one_prints(self):
+        self.write(
+            "project/session-1.jsonl",
+            reply("msg_1", "claude-opus-5-5", USAGE),
+            reply("msg_2", "claude-sonnet-4-5-20250929", {"input_tokens": 7}),
+        )
+        self.write("project/session-1/subagents/agent-x.jsonl", reply("msg_1", "claude-opus-5-5", USAGE))
+        cache = os.path.join(self.home.name, "cache", "usage.json")
+
+        fresh = self.scan()
+        self.assertEqual(self.scan(args=["--cache", cache]), fresh)
+        self.assertEqual(self.scan(args=["--cache", cache]), fresh)
+
+    def test_an_unchanged_transcript_is_read_from_the_cache(self):
+        self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 4}))
+        cache = os.path.join(self.home.name, "cache", "usage.json")
+        self.scan(args=["--cache", cache])
+
+        # Change the cached count and leave the transcript alone: a scan that trusts the cache shows the change.
+        with open(cache, encoding="utf-8") as handle:
+            data = json.load(handle)
+        (entry,) = data["files"].values()
+        entry["records"][0][4] = 999
+        with open(cache, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        self.assertEqual(self.scan(args=["--cache", cache])["days"][DAY]["claude-opus-5-5"]["input"], 999)
+
+    def test_a_transcript_that_changed_is_read_again(self):
+        self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 4}))
+        cache = os.path.join(self.home.name, "cache", "usage.json")
+        self.scan(args=["--cache", cache])
+
+        # A response appended to the file changes its size, so the cached read is not trusted.
+        file = os.path.join(self.home.name, ".claude", "projects", "project", "session-1.jsonl")
+        with open(file, "a", encoding="utf-8") as handle:
+            handle.write("\n" + reply("msg_2", "claude-opus-5-5", {"input_tokens": 6}))
+        self.assertEqual(self.scan(args=["--cache", cache])["days"][DAY]["claude-opus-5-5"]["input"], 10)
+
+    def test_a_transcript_that_was_removed_leaves_the_cache(self):
+        self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 4}))
+        self.write("project/session-2.jsonl", reply("msg_2", "claude-opus-5-5", {"input_tokens": 6}, session="session-2"))
+        cache = os.path.join(self.home.name, "cache", "usage.json")
+        self.scan(args=["--cache", cache])
+
+        os.remove(os.path.join(self.home.name, ".claude", "projects", "project", "session-2.jsonl"))
+        self.assertEqual(self.scan(args=["--cache", cache])["days"][DAY]["claude-opus-5-5"]["input"], 4)
+        with open(cache, encoding="utf-8") as handle:
+            self.assertEqual(len(json.load(handle)["files"]), 1)
+
+    def test_a_cache_that_is_not_valid_is_read_past_and_written_again(self):
+        self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 4}))
+        cache = os.path.join(self.home.name, "cache", "usage.json")
+        os.makedirs(os.path.dirname(cache))
+        with open(cache, "w", encoding="utf-8") as handle:
+            handle.write('{"version": 1, "files": ')
+
+        self.assertEqual(self.scan(args=["--cache", cache])["days"][DAY]["claude-opus-5-5"]["input"], 4)
+        with open(cache, encoding="utf-8") as handle:
+            self.assertEqual(json.load(handle)["version"], 1)
+
+    def test_a_cache_that_cannot_be_written_does_not_stop_the_scan(self):
+        self.write("project/session-1.jsonl", reply("msg_1", "claude-opus-5-5", {"input_tokens": 4}))
+        blocked = os.path.join(self.home.name, "blocked")
+        with open(blocked, "w", encoding="utf-8") as handle:
+            handle.write("a file where a folder is needed")
+
+        scan = self.scan(args=["--cache", os.path.join(blocked, "usage.json")])
+        self.assertEqual(scan["days"][DAY]["claude-opus-5-5"]["input"], 4)
+
 
 class SummarizeTest(unittest.TestCase):
     def setUp(self):
@@ -246,6 +315,7 @@ class SummarizeTest(unittest.TestCase):
         # USAGE adds up to 135 tokens: 10 input, 5 output, 100 cache read and 20 cache write.
         self.assertEqual(hours[DAY][hour], 135)
         self.assertEqual(sum(hours[DAY]), 135)
+
 
 
 if __name__ == "__main__":

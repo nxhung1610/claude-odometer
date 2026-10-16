@@ -1,8 +1,11 @@
 // Draws the illustrations in this folder, as SVG: `node docs/gen-visuals.mjs`. CI runs it
 // and fails if the committed SVGs differ. The colors are the reference palette's dark steps
-// and status steps; the text is what the mod draws in the terminal (hooks/register.tsx,
-// hooks/context.ts, hooks/format.ts, hooks/timing.ts and hooks/tokens.ts). The numbers in the
-// tokens pane are example data.
+// and status steps; the text is what the mod draws in the terminal (hooks/terminal-band.tsx,
+// hooks/terminal-pane.tsx, hooks/context.ts, hooks/format.ts, hooks/timing.ts and hooks/tokens.ts).
+// The numbers in the tokens pane are example data.
+//
+// Nothing here imports the mod: the copies of its rules below are pinned by hooks/illustrations.test.ts, and the
+// layout by hand. When the terminal's band or pane changes, change the drawing here to match.
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -322,6 +325,7 @@ function tokens() {
         ['  All time   ', C.secondary],
         [' Last 7 days ', C.primary, true],
         ['   Last 30 days', C.secondary],
+        ['   Refresh', C.secondary],
       ],
       130,
     ),
@@ -372,9 +376,10 @@ function tokens() {
   const grand = columns.reduce((sum, c) => sum + c.total, 0)
   parts.push(line([[`${formatTokens(grand)} tokens across ${SESSIONS} sessions.`, C.secondary]], bottom + 90))
   parts.push(line([['Each API response is counted once; /stats adds every log row.', C.secondary]], bottom + 112))
+  parts.push(line([['Scanned 19:05', C.secondary]], bottom + 134))
 
   // The heatmap: a shade for each weekday and hour, the hours labelled every third, and the key under it.
-  const heatTop = bottom + 146
+  const heatTop = bottom + 168
   parts.push(line([['When tokens are used, by hour (local time)', C.primary, true]], heatTop))
   const hourLabels = Array.from({ length: 24 }, (_, hour) => (hour % 3 === 0 ? String(hour).padEnd(2) : '  ')).join('')
   parts.push(line([[`    ${hourLabels}`, C.muted]], heatTop + 22))

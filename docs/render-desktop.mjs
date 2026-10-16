@@ -241,11 +241,6 @@ function render(node, out) {
       const p = paint(props.backgroundColor, SURFACE)
       out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${p.fill}"${p.opacity === undefined ? '' : ` fill-opacity="${p.opacity}"`}/>`)
     }
-    if (props.borderStyle !== undefined && w > 1 && h > 1) {
-      // A card: a slightly lighter panel with a faint edge, instead of a hard outline.
-      out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="#262625"/>`)
-      out.push(`<rect x="${x + 0.5}" y="${y + 0.5}" width="${w - 1}" height="${h - 1}" rx="11.5" fill="none" stroke="#ffffff" stroke-opacity="0.1"/>`)
-    }
     for (const child of node.children ?? []) render(child, out)
     return
   }

@@ -4,7 +4,7 @@ import type { ContextFill, ContextRow, ModelTokens, TokenRange, TokenScanState }
 
 import type { LegendItem } from './context'
 import { contextLegend, shareOf } from './context'
-import { compactTokens, toneOf } from './format'
+import { compactTokens, timeOfDay, toneOf } from './format'
 import type { Column } from './tokens'
 import { CHART_ROWS, WEEKDAYS, axisLabels, colorOf, dayLabel, formatShare, formatTokens, modelName, tokensOf } from './tokens'
 
@@ -23,6 +23,8 @@ export type PaneView = {
   selected: TokenRange
   ranges: ReadonlyArray<{ key: TokenRange; label: string }>
   onSelect: (range: TokenRange) => Promise<void>
+  /** Scans the transcripts again. */
+  onRefresh: () => Promise<void>
   context: ContextFill | null
   breakdown: ContextRow[]
   /** The days the chart and the heatmap cover, oldest first. */
@@ -128,6 +130,9 @@ function totals(view: PaneView, { Box, Text }: PaneElements) {
         </Text>
       </Box>
       <Text size="caption" color="inactive">Each API response is counted once; /stats adds every log row.</Text>
+      {view.state.status === 'ready' ? (
+        <Text size="caption" color="inactive" tabular>{`Scanned ${timeOfDay(view.state.at)}`}</Text>
+      ) : null}
     </Box>
   )
 }
@@ -241,7 +246,7 @@ function heatmap(view: PaneView, { Box, Text }: PaneElements) {
 
 /**
  * The /tokens pane on the desktop app: the context in use, the range buttons, the range's total, solid columns per day,
- * a bar per model, and the heatmap of hours. The terminal draws the same pane as text, in register.tsx.
+ * a bar per model, and the heatmap of hours. The terminal draws the same pane as text, in terminal-pane.tsx.
  */
 export function desktopPane(view: PaneView, els: PaneElements) {
   const { Box, Button, Text } = els
@@ -249,7 +254,7 @@ export function desktopPane(view: PaneView, els: PaneElements) {
   return (
     <Box flexDirection="column" gap={1}>
       {contextNow(view.context, view.breakdown, els)}
-      <Box flexDirection="row" columnGap={1}>
+      <Box flexDirection="row" columnGap={1} alignItems="center">
         {view.ranges.map(item => (
           <Button
             key={item.key}
@@ -259,6 +264,9 @@ export function desktopPane(view: PaneView, els: PaneElements) {
             {item.label}
           </Button>
         ))}
+        <Button key="refresh" variant="secondary" onPress={() => view.onRefresh()}>
+          Refresh
+        </Button>
       </Box>
       {state.status === 'idle' || state.status === 'scanning' ? <Text dimColor>Scanning transcripts…</Text> : null}
       {state.status === 'failed' ? <Text color="error">{`Could not read the transcripts: ${state.reason}`}</Text> : null}

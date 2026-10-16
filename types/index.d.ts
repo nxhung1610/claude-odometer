@@ -31,7 +31,8 @@ export type TokenScan = {
 export type TokenScanState =
   | { status: 'idle' }
   | { status: 'scanning' }
-  | { status: 'ready'; scan: TokenScan }
+  /** The scan's result, and when it finished, in milliseconds since the epoch. */
+  | { status: 'ready'; scan: TokenScan; at: number }
   | { status: 'failed'; reason: string }
 
 /** The span the `/tokens` pane charts. */
@@ -66,7 +67,7 @@ export type ContextFill = {
   percent?: number
 }
 
-/** The model the latest main-conversation step asked for, and the effort it was given, when its model has one. */
+/** The session's model, as `/model` shows it, and the effort its latest main-conversation step was given, when its model has one. */
 export type ModelInUse = {
   model: string
   effort?: string
@@ -90,7 +91,7 @@ declare module 'claude-code' {
       sweep: number
       /** The live context window, shown at the end of the quota row. */
       context: ContextFill | null
-      /** The model the latest main-conversation step asked for, shown at the start of the speed row. */
+      /** The session's model, as `/model` shows it, at the start of the speed row. */
       model: ModelInUse | null
       /** The session's cost in US dollars, shown at the end of the speed row. */
       cost: number | null

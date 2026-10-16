@@ -49,6 +49,12 @@ export function resetLabel(resetsAt: string | undefined, now: Date): string {
   return isToday ? time : `${DAYS[at.getDay()]} ${time}`
 }
 
+/** The local time of day a moment falls on, as `19:05`. */
+export function timeOfDay(at: number): string {
+  const date = new Date(at)
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 /** How long until the reset: `6h 20m`, `45m`, or `1d 21h` from a day away. Empty when unknown, `0m` once it has passed. */
 export function resetIn(resetsAt: string | undefined, now: Date): string {
   if (!resetsAt) return ''

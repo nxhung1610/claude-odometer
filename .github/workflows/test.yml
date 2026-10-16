@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -62,5 +62,6 @@ jobs:
         shell: bash
         run: |
           node docs/gen-visuals.mjs
+          node docs/collect-desktop.mjs
           node docs/render-desktop.mjs
           git diff --exit-code -- docs/

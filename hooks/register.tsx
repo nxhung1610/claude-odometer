@@ -1,33 +1,15 @@
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register, Timer } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
 import type { ContextFill, ContextRow, ModelInUse, ModelSpeed, ModelTokens, QuotaWindow, TokenRange, TokenScan, TokenScanState } from '../types'
 
-import { BAR_WIDTH, barCells, clip, compactTokens, filledCells, formatCost, labelOf, resetIn, resetsThatFit, toneOf } from './format'
-import { LEGEND_SPLIT, contextBar, contextLegend, packLegend, shareOf } from './context'
-import type { BarRun } from './context'
+import { contextAlert, limitAlert, minutesToFull, passed } from './alerts'
 import { desktopBand } from './band'
 import { desktopPane } from './pane'
-import { contextAlert, limitAlert, minutesToFull, passed } from './alerts'
-import { FRAME_MS, WORKING, applyStep, speedLine, sweepIndex } from './timing'
-import {
-  CHART_ROWS,
-  axisLabels,
-  chartRows,
-  colorOf,
-  columnsWithSegments,
-  dayLabel,
-  daysInRange,
-  formatShare,
-  formatTokens,
-  heatCell,
-  hourGrid,
-  modelName,
-  rankEntries,
-  sumModels,
-  tokensOf,
-  WEEKDAYS,
-} from './tokens'
+import { terminalBand } from './terminal-band'
+import { terminalPane } from './terminal-pane'
+import { FRAME_MS, applyStep, speedLine, sweepIndex } from './timing'
+import { columnsWithSegments, daysInRange, hourGrid, rankEntries, sumModels, tokensOf } from './tokens'
 
 const windows = atom(
   { plugin: 'odometer', key: 'windows' } as const,
@@ -82,11 +64,12 @@ const sweep = atom(
 )
 
 const PANE = 'tokens'
-// The context card is not drawn narrower than this, once its border and padding are taken off the band.
-const CARD_MIN_INNER = 20
 
 /** The chunks that mean the model has begun to answer; the stop and the engine's own do not. */
 const OUTPUT = new Set<string>(['text', 'thinking', 'tool', 'input'])
+
+/** How often the session's model is read again, so `/model` shows in the speed row without waiting for a step. */
+const MODEL_POLL_MS = 1000
 
 const RANGES: ReadonlyArray<{ key: TokenRange; label: string }> = [
   { key: 'all', label: 'All time' },
@@ -112,18 +95,65 @@ function rowsOf(breakdown: { categories: ContextRow[] } | undefined): ContextRow
   return breakdown ? breakdown.categories.map(({ name, tokens, kind }) => ({ name, tokens, kind })) : null
 }
 
+/**
+ * Scans the transcripts with the scanner the mod ships, and keeps the result, and when it finished, in the tokens state.
+ * The scanner keeps a cache in the plugin's own folder, so a later scan reads only the transcripts that have changed.
+ */
+async function scanTranscripts($: EngineInterface): Promise<void> {
+  await update($, tokens, () => ({ status: 'scanning' as const }))
+  try {
+    const python = await pythonFor(argv => $.process.run(argv, { timeoutMs: 10_000 }))
+    if (!python) throw new Error('Python 3 was not found on the PATH, as python3 or python')
+    const ran = await $.process.run(
+      [python, '-I', `${$.plugin.root}/hooks/scan_usage.py`, '--cache', `${$.plugin.root}/.cache/usage.json`],
+      { timeoutMs: 120_000 },
+    )
+    // The reply is cut at 4 MiB; a cut reply is not valid JSON, so say why instead.
+    if (ran.isStdoutTruncated) throw new Error('The scan printed more than 4 MiB, too much to read')
+    if (ran.exitCode === 0) {
+      const scan = JSON.parse(ran.stdout) as TokenScan
+      const at = await $.clock.now()
+      await update($, tokens, () => ({ status: 'ready' as const, scan, at }))
+    } else {
+      const reason = ran.stderr.trim().split('\n')[0] || 'the scanner exited with an error'
+      await update($, tokens, () => ({ status: 'failed' as const, reason }))
+    }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    await update($, tokens, () => ({ status: 'failed' as const, reason }))
+  }
+}
+
 export const register: Register = on => {
+  // The timer that follows the session's model, cancelled when a new session starts or the session ends.
+  let followTimer: Timer | undefined
+
   on('session.start', async ($, e, next) => {
     const startedAt = await $.clock.now()
     const reading = await $.session.usage({ breakdown: 'summary' })
-    await update($, windows, () => reading.rateLimits)
-    await update($, windowsAt, () => startedAt)
-    await update($, context, () => reading.context)
-    await update($, contextRows, () => rowsOf(reading.context.breakdown))
-    await update($, cost, () => reading.cost?.usd ?? null)
-    // A new session starts with no model in use and no speed to show, not the last session's.
-    await update($, model, () => null)
-    await update($, timing, () => null)
+    await Promise.all([
+      update($, windows, () => reading.rateLimits),
+      update($, windowsAt, () => startedAt),
+      update($, context, () => reading.context),
+      update($, contextRows, () => rowsOf(reading.context.breakdown)),
+      update($, cost, () => reading.cost?.usd ?? null),
+      // A new session starts with no speed to show, not the last session's, and with the model it opens on.
+      update($, model, () => null),
+      update($, timing, () => null),
+    ])
+    // The model follows `/model`. The engine pushes no event for it, so the session's model is read on a timer, and
+    // the band redraws only when it has changed. The effort belonged to the old model, so it goes with it: the new
+    // model's next step reports its own.
+    let followed: string | undefined
+    const follow = async () => {
+      const current = await $.session.model().catch(() => undefined)
+      if (!current || current === followed) return
+      followed = current
+      await update($, model, () => ({ model: current }))
+    }
+    await follow()
+    followTimer?.cancel()
+    followTimer = $.clock.every(MODEL_POLL_MS, () => follow().catch(() => undefined))
     // Runs at once when typed mid-turn: it reads the transcripts on disk, not the turn's state.
     await $.command.register({
       name: 'tokens',
@@ -131,6 +161,13 @@ export const register: Register = on => {
       immediate: true,
     })
 
+    return next(e)
+  })
+
+  // The model's timer stops with the session, so a session that has ended reads nothing more.
+  on('session.end', async (_, e, next) => {
+    followTimer?.cancel()
+    followTimer = undefined
     return next(e)
   })
 
@@ -206,31 +243,11 @@ export const register: Register = on => {
     }
   })
 
-  // Opens the pane first, then runs the scanner the mod ships. Only per-day
-  // token counts and session ids come back; no message text is kept.
+  // Opens the pane first, then scans the transcripts. Only per-day token counts and session ids come back; no message
+  // text is kept.
   on('command.run', { command: 'tokens' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Tokens per day' })
-    await update($, tokens, () => ({ status: 'scanning' as const }))
-    try {
-      const python = await pythonFor(argv => $.process.run(argv, { timeoutMs: 10_000 }))
-      if (!python) throw new Error('Python 3 was not found on the PATH, as python3 or python')
-      const ran = await $.process.run(
-        [python, '-I', `${$.plugin.root}/hooks/scan_usage.py`],
-        { timeoutMs: 120_000 },
-      )
-      // The reply is cut at 4 MiB; a cut reply is not valid JSON, so say why instead.
-      if (ran.isStdoutTruncated) throw new Error('The scan printed more than 4 MiB, too much to read')
-      if (ran.exitCode === 0) {
-        const scan = JSON.parse(ran.stdout) as TokenScan
-        await update($, tokens, () => ({ status: 'ready' as const, scan }))
-      } else {
-        const reason = ran.stderr.trim().split('\n')[0] || 'the scanner exited with an error'
-        await update($, tokens, () => ({ status: 'failed' as const, reason }))
-      }
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      await update($, tokens, () => ({ status: 'failed' as const, reason }))
-    }
+    await scanTranscripts($)
 
     return { text: 'Tokens pane updated.' }
   })
@@ -255,14 +272,11 @@ export const register: Register = on => {
     ])
     const now = new Date(nowMs)
     const { Box, Text } = $.ui.resolve(e)
-    const roomy = e.props.bodyColumns >= 105
-    const withReset = e.props.bodyColumns >= 97
-    const barWidth = e.props.bodyColumns >= 90 ? BAR_WIDTH : 6
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
-    // On the desktop app the band has its own drawing: the speed and the quota on one row, the quota as solid bars.
-    // The context is left to the desktop's own panel.
+    // The desktop app draws its own band: the speed and the quota on one row, the quota as solid bars, and the context
+    // left to its own panel. Every other surface draws the band as text, the terminal's way.
     if (e.surface === 'desktop') {
       return desktopBand(
         {
@@ -277,156 +291,25 @@ export const register: Register = on => {
         { Box, Text },
       )
     }
-    // The card is the band's width less its border and padding. The fill is absent until the session's
-    // first response, and again after a compaction: then the card shows a dash and an empty bar.
-    const inner = e.props.bodyColumns - 4
-    const withCard = inner >= CARD_MIN_INNER
-    const breakdown = ctxRows ?? []
-    // Before the first response the engine reports no fill, but the breakdown the session starts with already counts the
-    // tokens in use. The fill is worked out from it then, so the card shows its parts at once.
-    const usedTokens = breakdown.reduce((sum, row) => (row.kind === 'used' ? sum + row.tokens : sum), 0)
-    const estimated = fill !== null && fill.window > 0 && usedTokens > 0 ? Math.round((usedTokens / fill.window) * 100) : null
-    const ctxPercent = fill?.percent === undefined ? estimated : Math.round(fill.percent)
-    const ctxTone = ctxPercent === null ? null : toneOf(ctxPercent)
-    // The fill alone, when there is no part of the window to draw: a dash before the first response, else filled cells.
-    const fillBar: BarRun[] = ctxPercent === null || ctxTone === null
-      ? [{ color: 'subtle', glyph: '─', cells: inner }]
-      : [
-          { color: 'claude', glyph: '█', cells: Math.min(inner, filledCells(ctxPercent, inner)) },
-          { color: 'subtle', glyph: '─', cells: Math.max(0, inner - filledCells(ctxPercent, inner)) },
-        ]
-    // The parts of the window, once the breakdown has tokens to show: an all-zero breakdown would leave the bar empty.
-    const rowBar: BarRun[] = ctxPercent === null ? [] : contextBar(breakdown, inner)
-    const bar: BarRun[] = rowBar.length > 0 ? rowBar : fillBar
-    // The legend sits under the bar, which the terminal draws as text.
-    const legendLines = rowBar.length > 0 ? packLegend(contextLegend(breakdown), fill?.window ?? 0, inner) : []
-    // The tokens against the window: the last response's, or the breakdown's until a response reports them.
-    const shownTokens = fill?.tokens ?? (estimated === null ? undefined : usedTokens)
-    const tokensText = fill === null || shownTokens === undefined ? undefined : `${compactTokens(shownTokens)} of ${compactTokens(fill.window)}`
-    const withModel = e.props.bodyColumns >= 90
-    const withCost = e.props.bodyColumns >= 100
-
-    // The quota is drawn as the context is below it: a diamond heading, then one line with each window's bar,
-    // badge and reset time.
-    // A window keeps its reset time while the quota line fits the card; the last resets go first.
-    const windowParts = rows.map(w => ({
-      label: labelOf(w.kind),
-      badge: ` ${Math.round(w.percentUsed)}% `,
-      reset: withReset ? resetIn(w.resetsAt, now) : '',
-    }))
-    const resetShown = resetsThatFit(windowParts, inner, barWidth, roomy)
-    const quotaHeader = (
-      <Box flexDirection="row">
-        <Text color="claude">{'◆ '}</Text>
-        <Text bold>quota</Text>
-      </Box>
-    )
-    const quotaWindows = (
-      <Box flexDirection="row">
-        {rows.length === 0 ? (
-          <Text color="inactive">no data yet</Text>
-        ) : (
-          rows.map((w, i) => {
-            const percent = Math.round(w.percentUsed)
-            const tone = toneOf(percent)
-            const cells = barCells(percent, barWidth)
-            const reset = resetIn(w.resetsAt, now)
-
-            return (
-              <Box key={w.kind} flexDirection="row">
-                {i === 0 ? null : <Text color="inactive">{roomy ? '   ·   ' : ' · '}</Text>}
-                <Text color="inactive">{`${labelOf(w.kind)} `}</Text>
-                <Text color="claude">{cells.filled}</Text>
-                <Text color="subtle">{cells.empty}</Text>
-                <Text bold color={tone}>{` ${percent}% `}</Text>
-                {resetShown[i] && reset ? <Text color="inactive">{roomy ? `  ↻ ${reset}` : ` ↻ ${reset}`}</Text> : null}
-              </Box>
-            )
-          })
-        )}
-      </Box>
-    )
-    const quotaRow = (
-      <Box flexDirection="column">
-        {quotaHeader}
-        {quotaWindows}
-      </Box>
-    )
-
-    // The speed row sits above the card: the model in use, the light while a step runs, its speeds and the cost.
-    const speedRow = (
-      <Box flexDirection="row">
-        <Text color="inactive">{'  '}</Text>
-        {withModel && modelInUse !== null ? (
-          <Box flexDirection="row">
-            <Text color="claude">{clip(modelName(modelInUse.model), 18)}</Text>
-            <Text color="inactive">{modelInUse.effort === undefined ? ' · ' : ` (${modelInUse.effort}) · `}</Text>
-          </Box>
-        ) : null}
-        {running ? (
-          [...WORKING].map((letter, i) => (
-            <Text key={`letter-${i}`} color={i === lit ? 'claude' : 'inactive'} bold={i === lit}>
-              {letter}
-            </Text>
-          ))
-        ) : null}
-        <Text color="inactive">{running ? line.slice(WORKING.length) : line}</Text>
-        {withCost && spend !== null ? <Text color="inactive">{` · ${formatCost(spend)}`}</Text> : null}
-      </Box>
-    )
-
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        {speedRow}
-        {withCard ? (
-          <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
-            {quotaRow}
-            <Box flexDirection="row" justifyContent="space-between">
-              <Text wrap="truncate-end">
-                <Text color="claude">{'◆ '}</Text>
-                <Text bold>context</Text>
-              </Text>
-              {ctxPercent === null || ctxTone === null ? (
-                <Text dimColor>{fill === null ? '—' : `— of ${compactTokens(fill.window)}`}</Text>
-              ) : (
-                <Text wrap="truncate-start">
-                  {tokensText === undefined ? null : <Text dimColor>{`${tokensText} `}</Text>}
-                  <Text bold color={ctxTone}>{` ${ctxPercent}% `}</Text>
-                </Text>
-              )}
-            </Box>
-            {ctxPercent === null ? (
-              <Text dimColor wrap="truncate-end">{'the parts appear after the first response'}</Text>
-            ) : (
-              <Text>
-                {bar.map((run, index) => (
-                  <Text key={`bar-${index}`} color={run.color}>{run.glyph.repeat(run.cells)}</Text>
-                ))}
-              </Text>
-            )}
-            {legendLines.map((items, row) => (
-              <Text key={`legend-${row}`} wrap="truncate-end">
-                {items.map((item, index) => (
-                  <Text key={item.label}>
-                    {index > 0 ? LEGEND_SPLIT : null}
-                    <Text color={item.color}>{`${item.glyph} `}</Text>
-                    <Text dimColor>{`${item.label} `}</Text>
-                    <Text bold>{compactTokens(item.tokens)}</Text>
-                    <Text dimColor>{` ${shareOf(item.tokens, fill?.window ?? 0)}`}</Text>
-                  </Text>
-                ))}
-              </Text>
-            ))}
-          </Box>
-        ) : (
-          quotaRow
-        )}
-      </Box>
+    return terminalBand(
+      {
+        columns: e.props.bodyColumns,
+        now,
+        windows: rows,
+        fill,
+        breakdown: ctxRows ?? [],
+        model: modelInUse,
+        cost: spend,
+        speed: line,
+        running: running !== null,
+        lit,
+      },
+      { Box, Text },
     )
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Text } = $.ui.resolve(e)
+    const els = $.ui.resolve(e)
     const state = await read($, tokens)
     const selected = await read($, range)
     const ctxNow = await read($, context)
@@ -447,134 +330,29 @@ export const register: Register = on => {
     const maxColumns = Math.max(4, Math.min(60, Math.floor((columns - 12) / 2)))
     const bars = scan ? columnsWithSegments(scan, days, order, maxColumns) : []
     const max = Math.max(1, ...bars.map(bar => bar.total))
-    const grid = chartRows(bars, max)
-    const [topLabel, middleLabel, bottomLabel] = axisLabels(max)
-    const axis = (row: number): string => {
-      if (row === 0) return topLabel
-      if (row === Math.floor(CHART_ROWS / 2)) return middleLabel
-      if (row === CHART_ROWS - 1) return bottomLabel
-      return ''
+    const view = {
+      state,
+      selected,
+      ranges: RANGES,
+      onSelect: async (key: TokenRange) => {
+        await update($, range, () => key)
+      },
+      onRefresh: () => scanTranscripts($),
+      context: ctxNow,
+      breakdown: ctxRowsNow ?? [],
+      days,
+      entries,
+      grand,
+      sessions,
+      anyUsage,
+      hours,
+      hourMax,
+      bars,
+      max,
     }
-
-    // On the desktop app the pane has its own drawing: solid bars and cells, with the figures in larger type.
-    if (e.surface === 'desktop') {
-      return desktopPane(
-        {
-          columns,
-          state,
-          selected,
-          ranges: RANGES,
-          onSelect: async key => {
-            await update($, range, () => key)
-          },
-          context: ctxNow,
-          breakdown: ctxRowsNow ?? [],
-          days,
-          entries,
-          grand,
-          sessions,
-          anyUsage,
-          hours,
-          hourMax,
-          bars,
-          max,
-        },
-        { Box, Button, Text },
-      )
-    }
-
-    return (
-      <Box flexDirection="column">
-        {ctxNow === null || ctxNow.tokens === undefined ? null : (
-          <Box flexDirection="column" marginBottom={1}>
-            <Text bold>{`Context now: ${compactTokens(ctxNow.tokens)} of ${compactTokens(ctxNow.window)}`}</Text>
-            <Box flexDirection="row">
-              {contextLegend(ctxRowsNow ?? []).map(item => (
-                <Text key={item.label} color={item.color}>{`${item.glyph} ${item.label} ${compactTokens(item.tokens)}   `}</Text>
-              ))}
-            </Box>
-          </Box>
-        )}
-        <Box flexDirection="row">
-          {RANGES.map(item => (
-            <Button
-              key={item.key}
-              variant={item.key === selected ? 'primary' : 'secondary'}
-              onPress={() => update($, range, () => item.key)}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </Box>
-        {state.status === 'idle' || state.status === 'scanning' ? (
-          <Text dimColor>Scanning transcripts…</Text>
-        ) : null}
-        {state.status === 'failed' ? (
-          <Text color="error">{`Could not read the transcripts: ${state.reason}`}</Text>
-        ) : null}
-        {scan && grand === 0 && anyUsage ? <Text color="inactive">No tokens in this range.</Text> : null}
-        {scan && grand === 0 && !anyUsage ? (
-          <Text color="inactive">{`No transcripts with usage found in ${scan.root}.`}</Text>
-        ) : null}
-        {scan && grand > 0 ? (
-          <Box flexDirection="column">
-            {grid.map((line, row) => (
-              <Box key={`row-${row}`} flexDirection="row">
-                <Text color="inactive">{`${axis(row).padStart(7)} │ `}</Text>
-                {line.map((cell, col) => (
-                  <Text key={`col-${col}`} color={cell.color}>{`${cell.char} `}</Text>
-                ))}
-              </Box>
-            ))}
-            <Text color="inactive">{`${' '.repeat(7)} └${'─'.repeat(bars.length * 2)}`}</Text>
-            <Text color="inactive">
-              {`${' '.repeat(10)}${dayLabel(days[0] ?? '')} … ${dayLabel(days[days.length - 1] ?? '')}`}
-            </Text>
-            <Box flexDirection="row">
-              {entries.map(([id]) => (
-                <Text key={id} color={colorOf(id)}>{`■ ${modelName(id)}   `}</Text>
-              ))}
-            </Box>
-            {entries.map(([id, t]) => {
-              const share = (tokensOf(t) / grand) * 100
-              return (
-                <Box key={id} flexDirection="column">
-                  <Box flexDirection="row">
-                    <Text color={colorOf(id)}>{'● '}</Text>
-                    <Text bold>{modelName(id)}</Text>
-                    <Text color="inactive">{` (${formatShare(share)})`}</Text>
-                  </Box>
-                  <Text color="inactive">{`   In: ${formatTokens(t.input)} · Out: ${formatTokens(t.output)}`}</Text>
-                  <Text color="inactive">{`   Cache: ${formatTokens(t.cacheRead)} read · ${formatTokens(t.cacheWrite)} write`}</Text>
-                </Box>
-              )
-            })}
-            <Text color="inactive">
-              {`${formatTokens(grand)} tokens across ${sessions} ${sessions === 1 ? 'session' : 'sessions'}. Each API response is counted once; /stats adds every log row.`}
-            </Text>
-            <Box flexDirection="column" marginTop={1}>
-              <Text bold>{'When tokens are used, by hour (local time)'}</Text>
-              <Text color="inactive">
-                {`    ${Array.from({ length: 24 }, (_, hour) => (hour % 3 === 0 ? String(hour).padEnd(2) : '  ')).join('')}`}
-              </Text>
-              {WEEKDAYS.map((name, row) => (
-                <Box key={name} flexDirection="row">
-                  <Text color="inactive">{`${name} `}</Text>
-                  {(hours[row] ?? []).map((value, hour) => {
-                    const cell = heatCell(value, hourMax)
-                    return (
-                      <Text key={`hour-${hour}`} color={cell.color}>
-                        {`${cell.char} `}
-                      </Text>
-                    )
-                  })}
-                </Box>
-              ))}
-              <Text color="inactive">{'    less ░▒▓█ more'}</Text>
-            </Box>
-          </Box>
-        ) : null}
-      </Box>
-    )
+    // The desktop app draws its own pane: solid bars and cells, with the figures in larger type. Every other surface
+    // draws the pane as text, the terminal's way.
+    if (e.surface === 'desktop') return desktopPane({ ...view, columns }, els)
+    return terminalPane(view, els)
   })
 }
