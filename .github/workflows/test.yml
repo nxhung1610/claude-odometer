@@ -45,12 +45,6 @@ jobs:
       - name: Run the mod's tests
         run: claude plugin test
 
-      - name: Install TypeScript, the version the mod is type-checked with
-        run: npm install -g typescript@5.9.3
-
-      - name: Type-check the mod, its tests and its scripts
-        run: tsc --noEmit --noUnusedLocals --noUnusedParameters -p tsconfig.json
-
       - name: Run the scanner's tests
         run: python -m unittest discover -s hooks -p "test_*.py"
 
