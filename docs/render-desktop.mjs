@@ -68,6 +68,12 @@ function kidsOf(node) {
   return (node.children ?? []).filter(c => c !== null && c !== undefined && c !== false)
 }
 
+// A card has even padding on both sides; other boxes use their cells and rows.
+function padOf(props) {
+  if (props.borderStyle !== undefined) return [14, 14]
+  return [(props.paddingX ?? 0) * CELL_W, (props.paddingY ?? 0) * ROW_H]
+}
+
 function gapX(props) {
   const gap = props.gap ?? 0
   return props.columnGap !== undefined ? props.columnGap * CELL_W : gap * ROW_H
@@ -112,8 +118,7 @@ function measure(node) {
   if (node.type === 'Button') {
     return { w: measureText(plainText(node), DEFAULT_SIZE[0], 'semibold') + 32, h: DEFAULT_SIZE[1] + 10 }
   }
-  const padX = (props.paddingX ?? 0) * CELL_W
-  const padY = (props.paddingY ?? 0) * ROW_H
+  const [padX, padY] = padOf(props)
   const row = props.flexDirection === 'row'
   const columnGap = gapX(props)
   const rowGap = gapY(props)
@@ -143,8 +148,7 @@ function layout(node, x, y, w, h) {
   node.box = { x, y, w, h }
   if (node.type !== 'Box' || !node.children) return
   const props = node.props ?? {}
-  const padX = (props.paddingX ?? 0) * CELL_W
-  const padY = (props.paddingY ?? 0) * ROW_H
+  const [padX, padY] = padOf(props)
   const ix = x + padX
   const iy = y + padY
   const iw = w - padX * 2
@@ -235,11 +239,15 @@ function render(node, out) {
   if (node.type === 'Box') {
     if (props.backgroundColor !== undefined && w > 0 && h > 0) {
       const p = paint(props.backgroundColor, SURFACE)
-      out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${p.fill}"${p.opacity === undefined ? '' : ` fill-opacity="${p.opacity}"`}/>`)
+      // A one-row bar or cell is drawn a little shorter and rounded, so neighbours read apart.
+      const inset = Math.abs(h - ROW_H) < 0.5 ? 3 : 0
+      const radius = inset > 0 ? 3 : 0
+      out.push(`<rect x="${x}" y="${y + inset}" width="${w}" height="${h - inset * 2}" rx="${radius}" fill="${p.fill}"${p.opacity === undefined ? '' : ` fill-opacity="${p.opacity}"`}/>`)
     }
     if (props.borderStyle !== undefined && w > 1 && h > 1) {
-      const stroke = paint(props.borderColor, THEME.inactive).fill
-      out.push(`<rect x="${x + 0.5}" y="${y + 0.5}" width="${w - 1}" height="${h - 1}" rx="10" fill="none" stroke="${stroke}" stroke-opacity="0.6"/>`)
+      // A card: a slightly lighter panel with a faint edge, instead of a hard outline.
+      out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="#262625"/>`)
+      out.push(`<rect x="${x + 0.5}" y="${y + 0.5}" width="${w - 1}" height="${h - 1}" rx="11.5" fill="none" stroke="#ffffff" stroke-opacity="0.1"/>`)
     }
     for (const child of node.children ?? []) render(child, out)
     return
