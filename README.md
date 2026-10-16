@@ -2,19 +2,19 @@
 
 [![test](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml/badge.svg)](https://github.com/nxhung1610/claude-odometer/actions/workflows/test.yml)
 
-A Claude Code mod that shows, right above the prompt, a card with your account's 5-hour and 7-day usage limits and, in the terminal, the context window's fill; and on the line above it the model answering, how fast it answers, and the session's cost.
+A Claude Code mod that shows your account's 5-hour and 7-day usage limits and, in the terminal, the context window's fill, right above the prompt; and on the line above it the model answering, how fast it answers, and the session's cost. In the terminal the limits and the context sit in a card; in the desktop app the limits sit on the same line as the speed.
 
 ![The card in the terminal: the quota at three levels, with its percentages in green, amber and red, and the context below with its parts](docs/quota.svg)
 
 ## What it shows
 
-**Quota.** At the top of the card, under a `◆ quota` heading. In the terminal, one line gives each window a bar, its percentage, and `↻` with how long until its reset, like `6h 20m`, or `1d 21h` from a day away. In the desktop app, the windows sit side by side, each with a solid bar, its percentage in large type, and the reset time under the bar. The desktop app shows the reset as a clock time: just the time if it is later today, otherwise the weekday and time. The bar is in the Claude colour, and the percentage takes the colour of its range: green under 70%, amber from 70%, red from 90%.
+**Quota.** At the top of the card, under a `◆ quota` heading. In the terminal, one line gives each window a bar, its percentage, and `↻` with how long until its reset, like `6h 20m`, or `1d 21h` from a day away. In the desktop app, the windows sit on the speed row, side by side, each with its label, a solid bar, its percentage in bold, and its reset time; when the band is too narrow for both, the windows move to a row of their own. The desktop app shows the reset as a clock time: just the time if it is later today, otherwise the weekday and time. The bar is in the Claude colour, and the percentage takes the colour of its range: green under 70%, amber from 70%, red from 90%.
 
 **Context.** In the terminal, below the quota row in the same card: the context window, with its header of tokens against the window, like `92k of 200k`, and the fill as a percentage, in the colour of its range: green under 70%, amber from 70%, red from 90%. Below it, the bar has a colour for each group in use (system, tools, memory and messages), a dim `░` for the buffer that auto-compaction keeps back, and a thin `─` for the free space, with the legend under the bar. Until the session's first response, and again after a compaction until the next one, the fill is worked out from the breakdown, so the parts show at once. With no breakdown yet, the header shows the window alone, and the bar says the parts appear after the first response. The band in the desktop app leaves the context out, since the desktop app has its own context panel. The `/tokens` pane still shows the context in use.
 
 **Alerts.** When a limit or the context passes 90%, the mod raises one toast. A limit's toast says how long it has left at the pace it has been filling. The context's toast suggests `/compact`.
 
-**Speed.** The row above the card shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The row starts with that model and its effort, and on a wide band ends with the session's cost, as `/cost` totals it.
+**Speed.** The row above the prompt shows the latest model step's TTFT (time to first output) and TPS (output tokens per second). While a step runs, it also shows how long the step has run, and a light moves across the word `working`. A sub-agent's steps are not timed, so the row shows the main conversation's model. The row starts with that model and its effort, and on a wide band ends with the session's cost, as `/cost` totals it.
 
 ![While a step runs, a light moves across the word working, one letter at a time](docs/speed.svg)
 
@@ -26,7 +26,7 @@ A Claude Code mod that shows, right above the prompt, a card with your account's
 
 The desktop app draws the band and the `/tokens` pane with its own elements, not characters. These two images are drawn from the element tree the plugin gives the desktop surface, with example data. Their sizes and spacing are estimates, so the app's own rendering will differ.
 
-![The band on the desktop app: the speed row above a card with the quota, its windows as solid bars](docs/desktop-band.svg)
+![The band on the desktop app: the speed and the quota on one row, with no card, the windows as solid bars](docs/desktop-band.svg)
 
 ![The /tokens pane on the desktop app: the context in use, the range buttons, the total, the chart, a bar per model and the heatmap of hours](docs/desktop-pane.svg)
 
@@ -67,7 +67,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 
 - `session.start` reads the current rate-limit windows, the context fill with its breakdown, and the session's cost. It also clears the model and speed of any earlier session.
 - `session.measure` updates them when the engine reports a change in a window, in the context fill or in the cost. A change of the fill asks for the breakdown again, since a measure does not carry one. A limit or the context that passes 90% raises a toast.
-- `ui.render` on `AbovePrompt` draws the model's speed on a row above the prompt, and below it a card with the quota and, in the terminal, the context window. On the desktop app `hooks/band.tsx` draws the band with the quota alone; the terminal draws the band in `hooks/register.tsx`. The band yields while a survey holds it.
+- `ui.render` on `AbovePrompt` draws the model's speed on a row above the prompt, and below it a card with the quota and, in the terminal, the context window. On the desktop app `hooks/band.tsx` draws the speed and the quota on that one row, with no card; the terminal draws the band in `hooks/register.tsx`. The band yields while a survey holds it.
 - `turn.step` times each model step of the main conversation; a sub-agent's steps pass on untimed, since sub-agents can run alongside it and the row has one timing slot. It records the model and effort each one asked for. TTFT is the wait from the step's start to its first output: a chunk of text, thinking, a tool call, or its input. TPS is the step's output tokens per second from that output to its stop. While a step runs, the band redraws ten times a second: it shows how long the step has run, and a light moves across the word `working`.
 - `/tokens` opens a pane with tokens per day by model, for the last 7 days, the last 30 days, or all time, with the context in use and the heatmap. On the desktop app `hooks/pane.tsx` draws the pane; the terminal draws it in `hooks/register.tsx`. It runs `hooks/scan_usage.py` with Python 3 over the transcripts in `$CLAUDE_CONFIG_DIR/projects`, or in `~/.claude/projects` when that variable is unset or empty. The script parses each transcript line, but keeps only each response's usage counts, model and timestamp. It prints the tokens per day by model and per local hour, and for each range how many sessions had usage in it, with a sub-agent's usage counted under the session that spawned it. It sends nothing anywhere.
 
@@ -80,7 +80,7 @@ CI (`.github/workflows/test.yml`) runs the validation, the plugin tests and the 
 - `docs/desktop-band.json`, `docs/desktop-pane.json`: the element trees the desktop images are drawn from
 - `docs/render-desktop.mjs`: draws the desktop images, with `node docs/render-desktop.mjs`
 - `hooks/register.tsx`: hooks, the speed row and the card above the prompt in the terminal, with the quota and the context, the toasts, and the terminal's `/tokens` pane
-- `hooks/band.tsx`: the band on the desktop app, with the quota as solid bars and the large percentages
+- `hooks/band.tsx`: the band on the desktop app, with the speed and the quota on one row, the quota as solid bars
 - `hooks/pane.tsx`: the `/tokens` pane on the desktop app, with solid columns, a bar per model, and the heatmap
 - `hooks/alerts.ts`: the 90% toasts, and the time a limit has left at its pace
 - `hooks/context.ts`: the groups of the context bar, its runs and the legend's lines, and the tokens pane's legend

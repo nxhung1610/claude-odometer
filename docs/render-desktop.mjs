@@ -239,10 +239,7 @@ function render(node, out) {
   if (node.type === 'Box') {
     if (props.backgroundColor !== undefined && w > 0 && h > 0) {
       const p = paint(props.backgroundColor, SURFACE)
-      // A one-row bar or cell is drawn a little shorter and rounded, so neighbours read apart.
-      const inset = Math.abs(h - ROW_H) < 0.5 ? 3 : 0
-      const radius = inset > 0 ? 3 : 0
-      out.push(`<rect x="${x}" y="${y + inset}" width="${w}" height="${h - inset * 2}" rx="${radius}" fill="${p.fill}"${p.opacity === undefined ? '' : ` fill-opacity="${p.opacity}"`}/>`)
+      out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${p.fill}"${p.opacity === undefined ? '' : ` fill-opacity="${p.opacity}"`}/>`)
     }
     if (props.borderStyle !== undefined && w > 1 && h > 1) {
       // A card: a slightly lighter panel with a faint edge, instead of a hard outline.
@@ -289,6 +286,6 @@ ${shapes.join('\n')}
 `)
 }
 
-draw(`${HERE}desktop-band.json`, `${HERE}desktop-band.svg`, 100)
+draw(`${HERE}desktop-band.json`, `${HERE}desktop-band.svg`, 104)
 draw(`${HERE}desktop-pane.json`, `${HERE}desktop-pane.svg`, 60)
 console.log(`wrote desktop-band.svg and desktop-pane.svg to ${HERE}`)

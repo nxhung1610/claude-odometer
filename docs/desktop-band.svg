@@ -1,27 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="832" height="192" viewBox="0 0 832 192" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'DejaVu Sans', sans-serif">
-<rect width="832" height="192" rx="12" fill="#1f1f1e"/>
-<text x="32" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#d77757" font-weight="600">Opus 5.5</tspan></text>
-<text x="89.89600000000002" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">(high)</tspan></text>
-<text x="141.29600000000002" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">w</tspan></text>
-<text x="151.496" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">o</tspan></text>
-<text x="157.976" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#d77757" font-weight="600">r</tspan></text>
-<text x="162.26" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">k</tspan></text>
-<text x="168.73999999999998" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">i</tspan></text>
-<text x="171.73999999999998" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">n</tspan></text>
-<text x="178.21999999999997" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">g</tspan></text>
-<text x="200.70000000000002" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">3s · TTFT 850ms · last TPS 42 tok/s</tspan></text>
-<text x="431.74" y="28.16" font-size="12" xml:space="preserve"><tspan fill="#999999">$1.24</tspan></text>
-<rect x="16" y="50" width="800" height="126" rx="12" fill="#262625"/>
-<rect x="16.5" y="50.5" width="799" height="125" rx="11.5" fill="none" stroke="#ffffff" stroke-opacity="0.1"/>
-<text x="30" y="77.68" font-size="13.5" xml:space="preserve"><tspan fill="#d77757" font-weight="600">◆ </tspan><tspan fill="#ffffff" font-weight="600">quota</tspan></text>
-<text x="30" y="122.16" font-size="12" xml:space="preserve"><tspan fill="#999999">5h</tspan></text>
-<text x="357.68" y="119.76" font-size="20" xml:space="preserve"><tspan fill="#4eba65" font-weight="600">23%</tspan></text>
-<rect x="30" y="129" width="88" height="12" rx="3" fill="#d77757"/>
-<rect x="118" y="129" width="280" height="12" rx="3" fill="#505050"/>
-<text x="30" y="156.16" font-size="12" xml:space="preserve"><tspan fill="#999999">↻ 15:20</tspan></text>
-<text x="430" y="122.16" font-size="12" xml:space="preserve"><tspan fill="#999999">7d</tspan></text>
-<text x="757.6800000000001" y="119.76" font-size="20" xml:space="preserve"><tspan fill="#ff6b80" font-weight="600">91%</tspan></text>
-<rect x="430" y="129" width="336" height="12" rx="3" fill="#d77757"/>
-<rect x="766" y="129" width="32" height="12" rx="3" fill="#505050"/>
-<text x="430" y="156.16" font-size="12" xml:space="preserve"><tspan fill="#999999">↻ 09:45</tspan></text>
+<svg xmlns="http://www.w3.org/2000/svg" width="864" height="52" viewBox="0 0 864 52" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'DejaVu Sans', sans-serif">
+<rect width="864" height="52" rx="12" fill="#1f1f1e"/>
+<text x="32" y="32.16" font-size="12" xml:space="preserve"><tspan fill="#d77757" font-weight="600">Opus 5.5</tspan></text>
+<text x="89.89600000000002" y="32.16" font-size="12" xml:space="preserve"><tspan fill="#999999">(high)</tspan></text>
+<text x="141.29600000000002" y="32.16" font-size="12" xml:space="preserve"><tspan fill="#999999">TTFT 850ms · TPS 42 tok/s</tspan></text>
+<text x="319.416" y="32.16" font-size="12" xml:space="preserve"><tspan fill="#999999">$1.24</tspan></text>
+<text x="397.416" y="30.16" font-size="12" xml:space="preserve"><tspan fill="#999999">5h</tspan></text>
+<rect x="418.616" y="17" width="16" height="18" fill="#d77757"/>
+<rect x="434.616" y="17" width="64" height="18" fill="#505050"/>
+<text x="506.616" y="31.2" font-size="14" xml:space="preserve"><tspan fill="#4eba65" font-weight="600">23%</tspan></text>
+<text x="542.84" y="30.16" font-size="12" xml:space="preserve"><tspan fill="#999999">↻ 15:20</tspan></text>
+<text x="608.84" y="30.16" font-size="12" xml:space="preserve"><tspan fill="#999999">7d</tspan></text>
+<rect x="630.0400000000001" y="17" width="72" height="18" fill="#d77757"/>
+<rect x="702.0400000000001" y="17" width="8" height="18" fill="#505050"/>
+<text x="718.0400000000001" y="31.2" font-size="14" xml:space="preserve"><tspan fill="#ff6b80" font-weight="600">91%</tspan></text>
+<text x="754.2640000000001" y="30.16" font-size="12" xml:space="preserve"><tspan fill="#999999">↻ Fri 09:45</tspan></text>
 </svg>
