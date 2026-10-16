@@ -40,8 +40,8 @@ export type PaneView = {
   max: number
 }
 
-/** The chart is as many rows tall as the terminal's chart. */
-const CHART_HEIGHT = CHART_ROWS
+/** The chart is six rows tall, a little shorter than the terminal's, to keep the pane compact. */
+const CHART_HEIGHT = 6
 /** A day with usage is at least this share of the largest day, so a light day does not draw as a gap. */
 const MIN_DAY = 1 / (CHART_ROWS * 8)
 /** The unfilled part of a bar. */
@@ -180,7 +180,7 @@ function chart(view: PaneView, els: PaneElements) {
 /** Each model: its colour, its name and share, a bar of that share, and its input, output and cache tokens. */
 function modelRows(view: PaneView, { Box, Text }: PaneElements) {
   return (
-    <Box flexDirection="column" gap={2}>
+    <Box flexDirection="column" gap={1}>
       {view.entries.map(([id, tokens]) => {
         const share = (tokensOf(tokens) / view.grand) * 100
         return (
@@ -247,7 +247,7 @@ export function desktopPane(view: PaneView, els: PaneElements) {
   const { Box, Button, Text } = els
   const { state } = view
   return (
-    <Box flexDirection="column" gap={2}>
+    <Box flexDirection="column" gap={1}>
       {contextNow(view.context, view.breakdown, els)}
       <Box flexDirection="row" columnGap={1}>
         {view.ranges.map(item => (
@@ -267,7 +267,7 @@ export function desktopPane(view: PaneView, els: PaneElements) {
         <Text color="inactive">{`No transcripts with usage found in ${state.scan.root}.`}</Text>
       ) : null}
       {state.status === 'ready' && view.grand > 0 ? (
-        <Box flexDirection="column" gap={2}>
+        <Box flexDirection="column" gap={1}>
           {totals(view, els)}
           {chart(view, els)}
           {modelRows(view, els)}

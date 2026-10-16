@@ -261,11 +261,11 @@ export const register: Register = on => {
     const running = speed?.running ?? null
     const line = speedLine(running, speed?.ttftMs, speed?.tps, nowMs)
     const lit = running ? sweepIndex(frames * FRAME_MS) : undefined
-    // On the desktop app the band has its own drawing: the quota as solid bars. The context is left to the desktop's own panel.
+    // On the desktop app the band has its own drawing: the speed and the quota on one row, the quota as solid bars.
+    // The context is left to the desktop's own panel.
     if (e.surface === 'desktop') {
       return desktopBand(
         {
-          columns: e.props.bodyColumns,
           now,
           windows: rows,
           model: e.props.bodyColumns >= 90 ? modelInUse : null,
